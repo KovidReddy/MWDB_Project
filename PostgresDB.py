@@ -1,7 +1,7 @@
 import psycopg2
 
 class PostgresDB:
-    def __init__(self, password, host='localhost', database='postgres', user='postgres', port=5432):
+    def __init__(self, password, host='localhost', database='mwdb_project', user='postgres', port=5432):
         self.host = host
         self.database = database
         self.user = user

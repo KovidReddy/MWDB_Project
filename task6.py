@@ -14,4 +14,3 @@ sub_matrix = dim.subMatrix(conn, 'imagedata_m_pca', mat=False)
 for sub in sub_matrix[arg1]:
     print('Subject: ', sub[0])
     print('Weight:', sub[1])
-
