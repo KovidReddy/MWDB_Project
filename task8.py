@@ -12,4 +12,3 @@ bin_matrix, feature_matrix = dim.binMat(conn, 'imagedata_m_pca')
 # code to print
 print(bin_matrix[0][0])
 print(feature_matrix)
-
