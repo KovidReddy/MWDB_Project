@@ -15,9 +15,10 @@ import joblib
 from sklearn.cluster import KMeans
 import os
 import math
+import cv2
 
 
-no_clusters = 300
+no_clusters = 400
 
 class KMeans_SIFT:
     def __init__(self,k):
@@ -55,6 +56,13 @@ class dimReduction(imageProcess):
     def __init__(self, dirpath, ext='*.jpg'):
         super().__init__(dirpath=dirpath, ext=ext)
 
+    def fetchImagesAsPix(self, filename):
+        image = cv2.imread(filename)
+        size = np.asarray(image).shape
+        img_yuv = cv2.cvtColor(image, cv2.COLOR_BGR2YUV)
+        return img_yuv, size
+    
+    
     # Function to fetch Reduced dimensions from image
     def nmf(self, imageset, k, model_technique):
         model = NMF(n_components=k, init='random', random_state=0)
@@ -266,58 +274,59 @@ class dimReduction(imageProcess):
         (sk_histogram, sk_bin_edges) = np.histogram(sk.ravel(), bins=10)
         return np.array([np.array(m_histogram), np.array(sd_histogram), np.array(sk_histogram)])
 
+    
+    def singleImageFetch(self, img, feature):
+        filename = self.dirpath + img + '.jpg'
+        print(filename)
+        if feature == 'm':
+            pixels, size = self.fetchImagesAsPix(filename)
+            vals = self.imageMoments(pixels, size)
+        elif feature == 's':
+            vals = self.sift_features(filename)
+        elif feature == 'h':
+            vals = self.hog_process(filename)
+        elif feature == 'l':
+            vals = self.lbp_preprocess(filename)
+        else:
+            print('Incorrect value for Model provided')
+            exit()
+        return vals
+    
+    
     # Classify images based on label
     def classifyImg(self, conn, feature, img, label, dim):
-        # fetch image dataset
-        db_feature = 'imagedata_' + feature
+                # fetch image dataset
+        db_feature = 'imagedata_' + feature + '_' + dim + '_' + label
 
-        # Fetch the data for a particular label
-        if label in ['left', 'right']:
-            field = 'orient'
-        elif label in ['dorsal', 'palmar']:
-            field = 'aspect'
-        elif label in ['0', '1']:
-            field = 'accessories'
-        elif label in ['male', 'female']:
-            field = 'gender'
         cur = conn.cursor()
-        sqlj = "SELECT t1.imageid, t1.data FROM {db} t1 INNER JOIN img_meta t2 " \
-               "ON t1.imageid = t2.image_id WHERE t2.{field} = '{label}'".format(db=db_feature, field=field, label=label)
+        sqlj = "SELECT imageid, imagedata FROM {db}".format(db=db_feature)
         cur.execute(sqlj)
         label_data = cur.fetchall()
-        sqlf = "SELECT t1.data FROM {db} t1 where t1.imageid = '{img}'".format(db=db_feature, img=img)
-        cur.execute(sqlf)
-        image = cur.fetchall()[0][0]
-        if feature == 'm':
-            image = [float(x) for y in image for x in y]
-        else:
-            image = [float(x) for x in image]
         recs_flt = []
         img_meta = []
-        if feature == 'm':
-            for rec in label_data:
-                recs_flt.append([float(x) for y in rec[1] for x in y])
-                img_meta.append(rec[0])
-        else:
-            for rec in label_data:
-                recs_flt.append([float(y) for y in rec[1]])
-                img_meta.append(rec[0])
+        for rec in label_data:
+            recs_flt.append(eval(rec[1]))
+            img_meta.append(rec[0])
 
-        u, v = self.pca(np.array(recs_flt), 10)
-        imgs_red = np.dot(recs_flt, u).tolist()
+        image = self.singleImageFetch(img=img, feature=feature)
+        if feature == 'm':
+            image = [x for y in image for x in y]
+
+        # Check for which reduced dimension technique is being used
+        path = os.path.normpath(os.getcwd()  + os.sep + os.pardir + os.sep + 'Models'  +os.sep)
+        # with open(path + os.sep  + model +'.joblib', 'wb')
+        # path = os.path.normpath(os.getcwd() + os.sep + os.pardir + os.sep + 'Phase1\\Models' + os.sep)
+        model = joblib.load(path + os.sep + "{0}_{1}_{2}.joblib".format(feature, dim, label))
+        imgs_red = np.array(recs_flt)
         clf = svm.OneClassSVM(nu=0.1, kernel='rbf', gamma=0.1)
         clf.fit(imgs_red)
-        image = np.dot(np.array(image), u)
-        pred = clf.predict([image])
-        x = clf.decision_function([image])
+        image = np.array(image)
+        image = np.dot(image, model.components_.T)        
+        # image = model.transform(image.reshape(1,-1))
+        pred = clf.predict(image.reshape(1,-1))
+        x = clf.decision_function(image.reshape(1,-1))
         print(x)
         print(pred)
-        print(img_meta)
-        print('test image', sum(image))
-        print('label images:', sorted([sum(x) for x in imgs_red]))
-        centroid = np.mean(imgs_red, axis=0)
-        print('label distance from centroid:',sorted([self.l2Dist(centroid, i) for i in imgs_red], reverse=True))
-        print('image:', self.l2Dist(centroid, image))
 
     # Function to save the reduced dimensions to database
 
@@ -353,21 +362,22 @@ class dimReduction(imageProcess):
                 del imgs[i]
                 i -= 1
                 continue
-            if feature != "s":
-                imgs_data.append(imgs[i][1].reshape((-1)))
+            if feature == "s" or (feature == "m" and model in ("nmf", "lda")):
+                imgs_data.extend(imgs[i][1])
             else:
-                imgs_data.extend(imgs[i][1])   
+                imgs_data.append(imgs[i][1].reshape((-1)))  
                     # print (image_cmp.shape)
             imgs_meta.append(imgs[i][0])
             # print(i)
             # print(len(imgs))
         
         #Handle Negative Value of NMF
-        if feature == 'm':
-            if negative_handle == 'h':
-                imgs_data = self.hist(imgs_data)
-            else:
-                imgs_data = self.normalize(imgs_data)
+        # if feature == 'm' and (model == 'lda' or model == 'nmf'):
+        #     print ("Normalize")
+        #     if negative_handle == 'h':
+        #         imgs_data = self.hist(imgs_data)
+        #     else:
+        #         imgs_data = self.normalize(imgs_data)
         
         imgs_data = np.asarray(imgs_data)
         # print(imgs_data.shape)
@@ -382,7 +392,7 @@ class dimReduction(imageProcess):
 
         model = model.lower()
 
-        if feature == "s":
+        if feature == "s" or (feature == "m" and model in ("nmf", "lda")):
             if imgs_data.shape[0] < no_clusters:
                 Kmeans = KMeans_SIFT(imgs_data.shape[0] // 2)
             else:
@@ -395,16 +405,16 @@ class dimReduction(imageProcess):
         if model == 'nmf':
             w, h = self.nmf(imgs_data, k, technique_model)
             imgs_red = np.dot(imgs_data, h.T).tolist()
-            print(np.asarray(w).shape)
-            print(np.asarray(h).shape)
+            # print(np.asarray(w).shape)
+            # print(np.asarray(h).shape)
             imgs_sort = self.imgSort(w.T, imgs_meta)
             feature_sort = self.imgFeatureSort(h, imgs_zip)
 
         elif model == 'lda':
             w, h = self.lda(imgs_data, k, technique_model)
             imgs_red = np.dot(imgs_data, h.T).tolist()
-            print(np.asarray(w).shape)
-            print(np.asarray(h).shape)
+            # print(np.asarray(w).shape)
+            # print(np.asarray(h).shape)
             imgs_sort = self.imgSort(w.T, imgs_meta)
             feature_sort = self.imgFeatureSort(h, imgs_zip)
 

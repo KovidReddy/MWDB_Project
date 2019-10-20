@@ -1,4 +1,5 @@
 from dimReduction import dimReduction
+import os
 path = input("Please enter the home directory for the images "
             "(Default: C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Hands_test2\\) : ")
 if path == '':

@@ -33,7 +33,7 @@ TABLE_NAME = 'images_demo'
 PASSWORD = "mynhandepg"
 # dirpath='/home/anhnguyen/ASU/CSE-515/Project/Phase 1/Project - Phase 2/Data/testset1/'
 # ext='*.jpg'
-csvFile = "HandInfo.csv"
+csvFile = 'HandInfo.csv'
 
 
 
@@ -173,6 +173,7 @@ class imageProcess:
             cur.execute(sql)
             name = os.path.basename(filename)
             name = os.path.splitext(name)[0]
+            print(name)
             # create a cursor
             sql = "SELECT {field} FROM {db} WHERE {field} = '{condition}';".format(field="imageid",db=dbname,condition=name)
             # print("SQL Check Exist - HOG: ", sql)
@@ -188,7 +189,7 @@ class imageProcess:
                 # print("Exist HOG - Update")
                 # column = "HOG"
                 
-                sql = "UPDATE {db} SET {x} ='{y}' WHERE IMAGEID = '{id}'".format(x=name,y=values_st, db=dbname)
+                sql = "UPDATE {db} SET {x} ='{y}' WHERE IMAGEID = '{z}'".format(x='imagedata',y=values_st, z= name, db=dbname)
             
             cur.execute(sql)
             conn.commit()
@@ -253,6 +254,7 @@ class imageProcess:
         norm_b = np.linalg.norm(vec2)
         cos = 1 - dot_product / (norm_a * norm_b)
         return cos
+        # return ((1 + (dot / (norm1 * norm2)))/2)*100
         # return 1 - spatial.distance.cosine(vec1, vec2)
 
     # method to calculate Manhattan distance
@@ -267,6 +269,11 @@ class imageProcess:
         dist = cv2.norm(d1, d2, cv2.NORM_L2)
         return dist
 
+    def cosine_similarity(self, imageA, imageB):
+        # print(imageA)
+        # print(imageB)
+        return np.dot(imageA, imageB)/(np.sqrt(np.sum(imageA ** 2, axis=0))*np.sqrt(np.sum(imageB ** 2, axis=0)))
+    
     # Calculate the Euclidean distance
     def euclidean_distance(self, imageA, imageB):
         # d=math.sqrt(np.sum([((a-b) ** 2) for (a,b) in zip(imageA,imageB)]))
@@ -318,7 +325,7 @@ class imageProcess:
         model = joblib.load(path + os.sep + "{0}_{1}_{2}.joblib".format(feature, technique, label))
         latent = np.asarray(model.components_)
         
-        if feature == 's':
+        if feature == 's' or feature == 'm':
             kmeans = joblib.load(path + os.sep + 'kmeans_{0}_{1}.joblib'.format(latent.shape[1], label))
             histo = np.zeros(latent.shape[1])
             nkp = np.size(image_data)
@@ -335,6 +342,7 @@ class imageProcess:
         if conn is None:
             print("Can not connect to database")
             exit()
+        print(dbase)
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM " + dbase)
         data = cursor.fetchall()
@@ -350,18 +358,20 @@ class imageProcess:
             label = label.replace(" ", "_")
             image_data = self.dbFetch(conn,dbase, "WHERE imageid = '{0}'".format(image))
             image_data = self.queryImageNotLabel(image_data, feature, technique, label)
-            similarity[image] = self.euclidean_distance(image_data,image_data)
+            similarity[image] = self.cosine_sim(image_data,image_data)
             
         # print (image_id)
         for i in range(len(image_id)):
             image_cmp = np.asarray(eval(data[i][1]))
+            # print(data[i][0])
+            # print(data[i][1])
             # if self.metrics:
             #     # similarity[row[0]] = 1- self.cosine_similarity(image, result)
             #     similarity[image_id[i]] = 1 - st.pearsonr(image,image_cmp)[0]
             #     # similarity[row[0]] = mean_squared_error(image,result)
             #     # similarity[row[0]] = 0 - self.psnr(image,result)
             # else:
-            similarity[image_id[i]] = self.euclidean_distance(image_data,image_cmp)
+            similarity[image_id[i]] = self.cosine_sim(image_data,image_cmp)
         similarity = sorted(similarity.items(), key = lambda x : x[1], reverse=False)
         print(similarity)
         self.dispImages(similarity,feature, technique, 11, k)
@@ -374,7 +384,7 @@ class imageProcess:
                 rows += 1
         ax = []
         fig=plt.figure(figsize=(30, 20))
-        fig.canvas.set_window_title('Task 3 - Images Similarity')
+        fig.canvas.set_window_title('Task 3 - Images Similarity - Euclidean')
         fig.suptitle(str(no_images - 1) + ' Similar Images of ' + similarity[0][0] + ' based on ' + feature + ", "+ str(k) + " latent semantics and " + technique)
         # plt.title(str(no_images - 1) + ' Similar Images of ' + similarity[0][0] + ' based on ' + type,y=-0.01)
         plt.axis('off')
@@ -430,6 +440,7 @@ class imageProcess:
     
     
     def readMetaData(self):
+        print(self.dirpath + csvFile)
         with open(self.dirpath + csvFile, 'r') as file:
             csv_reader = csv.reader(file)
             meta_file = []
@@ -454,8 +465,8 @@ class imageProcess:
             index = "accessories"
         else:
             index = ""
-
-        with open(self.dirpath + csvFile, 'r', newline='') as f:
+        print(self.dirpath + csvFile)
+        with open('/home/anhnguyen/ASU/CSE-515/Project/Phase 2/Project - Phase 2/Data/testset1/HandInfo.csv', 'r', newline='') as f:
             reader = csv.reader(f, delimiter=',')
             # next(cr) gets the header row (row[0])
             header = next(reader)
@@ -474,10 +485,7 @@ class imageProcess:
         # print (filteredImage)
         return filteredImage
 
+# phase1 = imageProcess("/home/anhnguyen/ASU/CSE-515/Project/Phase 2/Project - Phase 2/Data/testset1/")
+# phase1.dbProcess(password = "mynhandepg", model = "m", process = "s")
 
-
-def cosine_similarity(imageA, imageB):
-        # print(imageA)
-        # print(imageB)
-        return np.dot(imageA, imageB)/(np.sqrt(np.sum(imageA ** 2, axis=0))*np.sqrt(np.sum(imageB ** 2, axis=0)))
 

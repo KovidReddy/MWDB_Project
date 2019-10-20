@@ -15,7 +15,7 @@ feature = input('Please choose a feature model - SIFT(s), Moments(m), LBP(l), Hi
 if feature not in ('s', 'm', 'l', 'h'):
     print('Please enter a valid feature model!')
     exit()
-technique = input('Please choose a dimensionality reduction technique - PCA(pca), SVD(svd), NMF(nmf), LDA(lda)')
+technique = input('Please choose a dimensionality reduction technique - PCA(pca), SVD(svd), NMF(nmf), LDA(lda): ')
 image = input("Insert the name of your image: ")
 k = input('Please provide the number of latent semantics(k): ')
 db = 'imagedata_' + feature + '_' + technique
