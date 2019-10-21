@@ -19,7 +19,7 @@ technique = input('Please choose a dimensionality reduction technique - PCA(pca)
 image = input("Insert the name of your image: ")
 k = input('Please provide the number of latent semantics(k): ')
 db = 'imagedata_' + feature + '_' + technique
-task2 = imageProcess("/home/anhnguyen/ASU/CSE-515/Project/Phase 2/Project - Phase 2/Data/testset1/")
+task2 = imageProcess(path)
 task2.similarity(feature, technique, db, int(k), image)
 # similarity(feature, technique, db, int(k), image)
 # imgs_sort, feature_sort = dim.saveDim(feature, technique, db, int(k))

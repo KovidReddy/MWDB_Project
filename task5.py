@@ -14,7 +14,8 @@ if feature not in ('s', 'm', 'l', 'h'):
 technique = input('Please choose a dimensionality reduction technique - PCA(pca), SVD(svd), NMF(nmf), LDA(lda): ')
 k = input('Please provide the number of latent semantics(k): ')
 label = input('Please provide the label: ')
-db = PostgresDB(password='mynhandepg', host='localhost',
+db = PostgresDB(password='abcdefgh', host='localhost',
                         database='mwdb', user='postgres', port=5432)
 conn = db.connect()
-dim.classifyImg(conn, feature, image, label, technique)
+x =dim.classifyImg(conn, feature, image, label, technique)
+print(x)

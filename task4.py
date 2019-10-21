@@ -20,7 +20,7 @@ label = input("Which label do you want: ")
 label = label.replace(" ", "_")
 db = 'imagedata_' + feature + '_' + technique + '_' + label
 dim = dimReduction(path, '*.jpg')
-task4 = imageProcess("/home/anhnguyen/ASU/CSE-515/Project/Phase 2/Project - Phase 2/Data/testset1/")
+task4 = imageProcess(path)
 # filteredImage = task4.CSV(label)
 task4.similarity(feature, technique, db, int(k), image, label)
 
