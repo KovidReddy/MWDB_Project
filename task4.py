@@ -5,9 +5,9 @@ from imageProcess import imageProcess
     
 
 path = input("Please enter the home directory for the images "
-            "(Default: C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Hands_test2\\) : ")
+            "(Default: C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Dataset\\) : ")
 if path == '':
-    path = 'C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Hands_test2\\'
+    path = 'C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Dataset\\'
 dim = dimReduction(path, '*.jpg')
 feature = input('Please choose a feature model - SIFT(s), Moments(m), LBP(l), Histogram(h): ')
 if feature not in ('s', 'm', 'l', 'h'):
@@ -20,7 +20,7 @@ label = input("Which label do you want: ")
 label = label.replace(" ", "_")
 db = 'imagedata_' + feature + '_' + technique + '_' + label
 dim = dimReduction(path, '*.jpg')
-task4 = imageProcess("/home/anhnguyen/ASU/CSE-515/Project/Phase 2/Project - Phase 2/Data/testset1/")
+task4 = imageProcess(path)
 # filteredImage = task4.CSV(label)
 task4.similarity(feature, technique, db, int(k), image, label)
 

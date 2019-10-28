@@ -7,9 +7,9 @@ import os
 
 
 path = input("Please enter the home directory for the images "
-            "(Default: C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Hands_test2\\) : ")
+            "(Default: C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Dataset\\) : ")
 if path == '':
-    path = 'C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Hands_test2\\'
+    path = 'C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Dataset\\'
 dim = dimReduction(path, '*.jpg')
 feature = input('Please choose a feature model - SIFT(s), Moments(m), LBP(l), Histogram(h): ')
 if feature not in ('s', 'm', 'l', 'h'):
@@ -22,13 +22,18 @@ db = 'imagedata_' + feature
 dim = dimReduction(path, '*.jpg')
 # task3 = imageProcess("/home/anhnguyen/ASU/CSE-515/Project/Phase 2/Project - Phase 2/Data/testset1/")
 # filterImage = task3.CSV(label)
-imgs_sort, feature_sort = dim.saveDim(feature, technique, db, int(k), password = "mynhandepg", database = "mwdb", label = label, meta = True)
+imgs_sort, feature_sort, data_latent, feature_latent = dim.saveDim(feature, technique, db, int(k), password = "1Idontunderstand", database = "postgres", label = label, meta = True)
 
-path = os.path.normpath(os.getcwd()  + os.sep + os.pardir + os.sep + 'Outputs'  +os.sep)
-print(path)
+path = os.path.normpath(os.getcwd()  + os.sep + os.pardir + os.sep + 'Phase1\\Outputs'  +os.sep)
+# print(path)
 print('\n')
 print('Data Latent Semantics Saved to Output Folder!')
-dim.writeFile(imgs_sort, path + os.sep + 'Task3_Data_ls_{x}_{y}_{z}.txt'.format(x=feature,y=technique,z=k))
+# print(data_latent)
+dim.writeFile(data_latent, path + os.sep + 'Task3_Data_ls_{x}_{y}_{z}_{l}.txt'.format(x=feature,y=technique,z=k, l = label))
 print('\n')
 print('Feature Latent Semantics Saved to Output Folder!')
-dim.writeFile(feature_sort, path + os.sep + 'Task3_Feature_ls_{x}_{y}_{z}.txt'.format(x=feature,y=technique,z=k))
+# print(feature_latent)
+dim.writeFile(feature_latent, path + os.sep + 'Task3_Feature_ls_{x}_{y}_{z}.txt'.format(x=feature,y=technique,z=k, l = label))
+# print(feature_sort)
+dim.imgViz(imgs_sort)
+dim.imgViz_feature(feature_sort)

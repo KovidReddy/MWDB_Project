@@ -33,7 +33,7 @@ TABLE_NAME = 'images_demo'
 PASSWORD = "1Idontunderstand"
 # dirpath='/home/anhnguyen/ASU/CSE-515/Project/Phase 1/Project - Phase 2/Data/testset1/'
 # ext='*.jpg'
-csvFile = "HandInfo.csv"
+csvFile = 'HandInfo.csv'
 
 
 
@@ -173,6 +173,7 @@ class imageProcess:
             cur.execute(sql)
             name = os.path.basename(filename)
             name = os.path.splitext(name)[0]
+            # print(name)
             # create a cursor
             sql = "SELECT {field} FROM {db} WHERE {field} = '{condition}';".format(field="imageid",db=dbname,condition=name)
             # print("SQL Check Exist - HOG: ", sql)
@@ -180,15 +181,13 @@ class imageProcess:
 
             # cur.execute(sql)
             if cur.fetchone() is None:
-                print("Insert")
                 # print("Not Exist HOG - Insert")
                 sql = "INSERT INTO {db} VALUES('{x}', '{y}');".format(x=name,y=values_st, db=dbname)
             else:
-                print("Update")
                 # print("Exist HOG - Update")
                 # column = "HOG"
                 
-                sql = "UPDATE {db} SET {x} ='{y}' WHERE IMAGEID = '{id}'".format(x=name,y=values_st, db=dbname)
+                sql = "UPDATE {db} SET {x} ='{y}' WHERE IMAGEID = '{z}'".format(x='imagedata',y=values_st, z= name, db=dbname)
             
             cur.execute(sql)
             conn.commit()
@@ -211,7 +210,7 @@ class imageProcess:
         # dbname = 'imagedata_' + model
         # if condition:
         #     dbname += "_" + technique
-        sql = "SELECT * FROM {db} {condition}".format(db=dbname, condition=condition)
+        sql = "SELECT * FROM {db} {condition}".format(db=dbname, condition = condition)
         # print (sql)
         cur.execute(sql)
         recs = cur.fetchall()
@@ -251,8 +250,9 @@ class imageProcess:
         dot_product = np.dot(vec1, vec2)
         norm_a = np.linalg.norm(vec1)
         norm_b = np.linalg.norm(vec2)
-        cos = 1 - dot_product / (norm_a * norm_b)
-        return cos
+        # cos = 1 - (dot_product / (norm_a * norm_b))
+        # return cos
+        return ((1 + (dot_product / (norm_a * norm_b)))/2)*100
         # return 1 - spatial.distance.cosine(vec1, vec2)
 
     # method to calculate Manhattan distance
@@ -267,6 +267,11 @@ class imageProcess:
         dist = cv2.norm(d1, d2, cv2.NORM_L2)
         return dist
 
+    def cosine_similarity(self, imageA, imageB):
+        # print(imageA)
+        # print(imageB)
+        return np.dot(imageA, imageB)/(np.sqrt(np.sum(imageA ** 2, axis=0))*np.sqrt(np.sum(imageB ** 2, axis=0)))
+    
     # Calculate the Euclidean distance
     def euclidean_distance(self, imageA, imageB):
         # d=math.sqrt(np.sum([((a-b) ** 2) for (a,b) in zip(imageA,imageB)]))
@@ -313,28 +318,32 @@ class imageProcess:
         # image_data = cursor.fetchall()
         # print(image_data)
         image_data = np.asarray(eval(image_data[0][1]))
-        path = os.path.normpath(os.getcwd()  + os.sep + os.pardir + os.sep + 'Models'  +os.sep)
+        path = os.path.normpath(os.getcwd()  + os.sep + os.pardir + os.sep + 'Phase1\\Models'  +os.sep)
 
         model = joblib.load(path + os.sep + "{0}_{1}_{2}.joblib".format(feature, technique, label))
-        latent = np.asarray(model.components_)
         
-        if feature == 's':
-            kmeans = joblib.load(path + os.sep + 'kmeans_{0}_{1}.joblib'.format(latent.shape[1], label))
+        if feature == 's' or (feature == 'm' and technique in ("nmf", "lda")):
+            latent = np.asarray(model.components_)
+            kmeans = joblib.load(path + os.sep + 'kmeans_{0}_{1}_{2}.joblib'.format(latent.shape[1],feature,label))
             histo = np.zeros(latent.shape[1])
             nkp = np.size(image_data)
             for d in image_data:
                 idx = kmeans.predict([d])
                 histo[idx] += 1/nkp
-        print(np.asarray((model.components_)).shape)
-        image_data = np.asarray(histo).dot(latent.T)
+            image_data = np.asarray(histo)
+        image_data = model.transform([image_data])[0]
+
+        # print(np.asarray((model.components_)).shape)
+        # print(image_data)
         return image_data
         
     def similarity (self, feature, technique, dbase, k, image, label = ""):
-        db = PostgresDB(password = "mynhandepg", database = "mwdb")
+        db = PostgresDB(password = "1Idontunderstand", database = "postgres")
         conn = db.connect()
         if conn is None:
             print("Can not connect to database")
             exit()
+        # print(dbase)
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM " + dbase)
         data = cursor.fetchall()
@@ -342,7 +351,7 @@ class imageProcess:
         similarity = {}
         if image in image_id:
             image_index = image_id.index(image)
-            print(image_index)
+            # print(image_index)
             image_data = np.asarray(eval(data[image_index][1]))
         else:
             print("Not Same Label")
@@ -355,31 +364,34 @@ class imageProcess:
         # print (image_id)
         for i in range(len(image_id)):
             image_cmp = np.asarray(eval(data[i][1]))
+            # print(data[i][0])
+            # print(data[i][1])
             # if self.metrics:
             #     # similarity[row[0]] = 1- self.cosine_similarity(image, result)
             #     similarity[image_id[i]] = 1 - st.pearsonr(image,image_cmp)[0]
             #     # similarity[row[0]] = mean_squared_error(image,result)
             #     # similarity[row[0]] = 0 - self.psnr(image,result)
             # else:
-            similarity[image_id[i]] = self.euclidean_distance(image_data,image_cmp)
+            similarity[image_id[i]] =  self.euclidean_distance(image_data,image_cmp)
+        # print(similarity)
         similarity = sorted(similarity.items(), key = lambda x : x[1], reverse=False)
-        print(similarity)
-        self.dispImages(similarity,feature, technique, 11, k)
+        # print(similarity)
+        self.dispImages(similarity,feature, technique, 11, k, label)
 
     # Method to display images
-    def dispImages(self, similarity, feature, technique, no_images, k):
+    def dispImages(self, similarity, feature, technique, no_images, k, label):
         columns = 4
         rows = no_images // columns
         if no_images  % columns != 0:
                 rows += 1
         ax = []
         fig=plt.figure(figsize=(30, 20))
-        fig.canvas.set_window_title('Task 3 - Images Similarity')
-        fig.suptitle(str(no_images - 1) + ' Similar Images of ' + similarity[0][0] + ' based on ' + feature + ", "+ str(k) + " latent semantics and " + technique)
+        fig.canvas.set_window_title('Task 3 - Images Similarity - Euclidean')
+        fig.suptitle(str(no_images - 1) + ' Similar Images of ' + similarity[0][0] + ' based on ' + feature + ", "+ str(k) + " latent semantics and " + technique + " " + label)
         # plt.title(str(no_images - 1) + ' Similar Images of ' + similarity[0][0] + ' based on ' + type,y=-0.01)
         plt.axis('off')
         # fig.title(str(k) + 'Similar Images of ' + similarity[0][0] + ' based on ' + type)
-        f= open("../Outputs/task3_result.txt","w+")
+        f=open("../Phase1/Outputs/task3_result.txt","w+")
         f.write("Task 2 - Matching Score " + str(no_images) + " images with " + similarity[0][0] + ' based on ' + feature + ", "+ str(k) + " latent semantics and " + technique + ":\n")
         for i in range(no_images):
             f.write(similarity[i][0] + ": " + str(similarity[i][1]) + "\n")
@@ -387,12 +399,12 @@ class imageProcess:
             # create subplot and append to ax
             ax.append( fig.add_subplot(rows, columns, i+1))
             if i == 0:
-                    ax[-1].set_title("Given Image: " +similarity[i][0] )  # set title
+                    ax[-1].set_title("Given Image: " +similarity[i][0])  # set title
             else:
-                    ax[-1].set_title("Image "+str(i) + ": " +similarity[i][0] )  # set title
+                    ax[-1].set_title("Image "+str(i) + ": " +similarity[i][0] + '\nScore: ' + str(float(similarity[i][1])))  # set title
             ax[-1].axis('off')
             plt.imshow(img)
-        plt.savefig('../Outputs/task3_result.png')
+        plt.savefig('../Phase1/Outputs/task2_result.png')
         f.close()
         plt.show()
         plt.close()
@@ -416,6 +428,7 @@ class imageProcess:
         # Create cursor
         cur = conn.cursor()
         # Create the meta table
+        cur.execute('DROP TABLE IF EXISTS img_meta')
         sqlc = "CREATE TABLE IF NOT EXISTS " \
                "img_meta(subjectid TEXT, image_id TEXT, gender TEXT, aspect TEXT, orient TEXT, accessories TEXT)"
         cur.execute(sqlc)
@@ -430,6 +443,7 @@ class imageProcess:
     
     
     def readMetaData(self):
+        # print(self.dirpath + csvFile)
         with open(self.dirpath + csvFile, 'r') as file:
             csv_reader = csv.reader(file)
             meta_file = []
@@ -444,40 +458,59 @@ class imageProcess:
                 meta_file.append([sub_id, id, gender, orientation[0], orientation[1], accessories])
             return meta_file
 
-    def CSV(self, label = ""):
+    def CSV(self, conn, dbase, label = ""):
         label = label.lower()
-        if label in ("dorsal", "palmar", "left", "right"):
-            index = "aspectOfHand"
-        elif label in ("male", "female"):
-            index = "gender"
-        elif label in ("with accessories", "without accessories"):
-            index = "accessories"
-        else:
-            index = ""
 
-        with open(self.dirpath + csvFile, 'r', newline='') as f:
-            reader = csv.reader(f, delimiter=',')
-            # next(cr) gets the header row (row[0])
-            header = next(reader)
-            i = header.index(index)
-            id = header.index("imageName")
-            # print(i,index)
-            # list comprehension through remaining cr iterables
-            if index in ("aspectOfHand", "gender"):
-                filteredImage = [row[id][:len(row[id]) - 4] for row in reader if row[i].find(label) != -1]
-            elif label == "with accessories":
-                filteredImage = [row[id][:len(row[id]) - 4] for row in reader if int(row[i]) == 0]
-            elif label == "without accessories":
-                filteredImage = [row[id][:len(row[id]) - 4] for row in reader if int(row[i]) == 1]
-            # else:
-            #     return data, header
-        # print (filteredImage)
+        if label in ['left', 'right']:
+            field = 'orient'
+        elif label in ['dorsal', 'palmar']:
+            field = 'aspect'
+        elif label in ['with accessories', 'without accessories']:
+            field = 'accessories'
+            if label == 'with accessories':
+                label = '1'
+            else:
+                label = '0'
+        elif label in ['male', 'female']:
+            field = 'gender'
+
+        cur = conn.cursor()
+        sqli = "SELECT image_id, imagedata from img_meta INNER JOIN {db} ON image_id = imageid WHERE {field} = '{label}'".format(field=field, label=label, db = dbase)
+        cur.execute(sqli)
+        filteredImage = [(x[0],eval(x[1])) for x in cur.fetchall()]
+        # print(filteredImage)
+        # if label in ("dorsal", "palmar", "left", "right"):
+        #     index = "aspectOfHand"
+        # elif label in ("male", "female"):
+        #     index = "gender"
+        # elif label in ("with accessories", "without accessories"):
+        #     index = "accessories"
+        # else:
+        #     index = ""
+        # print(self.dirpath + csvFile)
+        # print(index)
+        # with open('/home/anhnguyen/ASU/CSE-515/Project/Phase 2/Project - Phase 2/Data/testset1/HandInfo.csv', 'r', newline='') as f:
+        #     reader = csv.reader(f, delimiter=',')
+        #     # next(cr) gets the header row (row[0])
+        #     header = next(reader)
+        #     i = header.index(index)
+        #     id = header.index("imageName")
+        #     # print(i,index)
+        #     # list comprehension through remaining cr iterables
+        #     if index in ("aspectOfHand", "gender"):
+        #         filteredImage = [row[id][:len(row[id]) - 4] for row in reader if row[i].find(label) != -1]
+        #     elif label == "with accessories":
+        #         filteredImage = [row[id][:len(row[id]) - 4] for row in reader if row[i] == '1']
+        #     elif label == "without accessories":
+        #         filteredImage = [row[id][:len(row[id]) - 4] for row in reader if int(row[i]) == '0']
+        #     # else:
+        #     #     return data, header
+        # # print (filteredImage)
         return filteredImage
 
+# phase1 = imageProcess("/home/anhnguyen/ASU/CSE-515/Project/Phase 2/Project - Phase 2/Data/Dataset2/")
+# for m in ('l', 'm', 'h'):
+#     print(m)
+#     phase1.dbProcess(password = "abcdefgh", model = m, process = "s")
 
-
-def cosine_similarity(imageA, imageB):
-        # print(imageA)
-        # print(imageB)
-        return np.dot(imageA, imageB)/(np.sqrt(np.sum(imageA ** 2, axis=0))*np.sqrt(np.sum(imageB ** 2, axis=0)))
 

@@ -1,10 +1,11 @@
 import imageProcess
 import numpy as np
-ip = imageProcess.imageProcess(dirpath='C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Hands_test2\\')
+ip = imageProcess.imageProcess('C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Dataset\\')
 arg = input("Which task would you like to run (1/2/3)? ")
 if arg == '1':
-    inp = input("Would you like to save SIFT features or Moment features (s/m)?")
-    ip.dbProcess(password='1Idontunderstand', model=inp, process='s')
+    for x in ['s', 'l', 'h', 'm']:
+        print(x)
+        ip.dbProcess(password='1Idontunderstand', model=x, process='s')
 
 elif arg == '2':
     inp1 = input("Would you like to fetch SIFT features or Moment features (s/m)?")
