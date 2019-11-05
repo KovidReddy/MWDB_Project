@@ -1,22 +1,34 @@
 import psycopg2
-
+import json
 class PostgresDB:
-    def __init__(self, password, host='localhost', database='mwdb_project', user='postgres', port=5432):
-        self.host = host
-        self.database = database
-        self.user = user
-        self.port = port
-        self.password = password
+    # Fetch Config file
+    def config(self):
+        try:
+            with open('config.json') as f:
+                js = json.load(f)
+                host = js['host']
+                database = js['database']
+                user = js['user']
+                port = js['port']
+                password = js['password']
+
+        except Exception as error:
+            print(error)
+            exit(-1)
+
+        return host, database, user, port, password
 
     def connect(self):
         conn = None
+        host, database, user, port,  password = self.config()
         try:
             # connect to the PostgreSQL server
             print('Connecting to the PostgreSQL database...')
-            conn = psycopg2.connect(host=self.host, database=self.database,
-                                    user=self.user, password=self.password, port=self.port)
+            conn = psycopg2.connect(host=host, database=database,
+                                    user=user, password=password, port=port)
 
         except (Exception, psycopg2.DatabaseError) as error:
             print(error)
+            exit(-1)
         return conn
 

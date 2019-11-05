@@ -1,0 +1,7 @@
+{
+  "dataset":"C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Dataset\\",
+  "model": "C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Models\\",
+  "meta": "C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Dataset\\HandInfo.csv",
+  "outputs": "C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Outputs",
+  "ogpath": "C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Hands\\"
+}

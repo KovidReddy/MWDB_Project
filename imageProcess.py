@@ -5,42 +5,41 @@ Last Edited On: 9/22/2019
 Class Description: Class to Extract Features from images
 """
 # Import statements
-import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import glob
 import numpy as np
 from scipy.stats import skew
 from PostgresDB import PostgresDB
 import tqdm
-import os
 import cv2
 from skimage import feature
 from skimage.transform import downscale_local_mean
-from scipy.linalg import svd
-from scipy.sparse.linalg import svds
-# import time
-import math
 import joblib
-
+import json
 # Task 3 4 5
 import csv
 import matplotlib.pyplot as plt
-import copy
 import os
 
-DATABASE_NAME = 'postgres'
-TABLE_NAME = 'images_demo'
-PASSWORD = "1Idontunderstand"
-# dirpath='/home/anhnguyen/ASU/CSE-515/Project/Phase 1/Project - Phase 2/Data/testset1/'
-# ext='*.jpg'
-csvFile = 'HandInfo.csv'
-
-
-
-
 class imageProcess:
-    def __init__(self, dirpath, ext='*.jpg'):
-        self.dirpath = dirpath
+    def paths(self):
+        try:
+            with open('paths.json') as f:
+                js = json.load(f)
+                dataset = js['dataset']
+                model = js['model']
+                meta = js['meta']
+                ogpath = js['ogpath']
+                outputs = js['outputs']
+
+        except Exception as error:
+            print(error)
+            exit(-1)
+
+        return dataset, model, meta, ogpath, outputs
+
+    def __init__(self, ext='*.jpg'):
+        self.dirpath, self.modelpath, self.metapath, self.ogpath, self.outpath = self.paths()
         self.ext = ext
 
     # Method to fetch images as pixels
@@ -144,26 +143,18 @@ class imageProcess:
                 momments = self.imageMoments(pixels, size)
                 # Convert to string to insert into DB as an array
                 values_st = str(np.asarray(momments).tolist())
-                # values_st = str(momments).replace('[', '{')
-                # values_st = values_st.replace(']', '}')
                 dbname = 'imagedata_m'
             elif model == 's':
                 des = self.sift_features(filename)
                 values_st = str(np.asarray(des).tolist())
-                # values_st = str(des.tolist()).replace('[', '{')
-                # values_st = values_st.replace(']', '}')
                 dbname = 'imagedata_s'
             elif model == 'h':
                 h_val = self.hog_process(filename)
                 values_st = str(np.asarray(h_val).tolist())
-                # values_st = str(h_val.tolist()).replace('[', '{')
-                # values_st = values_st.replace(']', '}')
                 dbname = 'imagedata_h'
             elif model == 'l':
                 lbp_val = self.lbp_preprocess(filename)
                 values_st = str(np.asarray(lbp_val).tolist())
-                # values_st = str(lbp_val.tolist()).replace('[', '{')
-                # values_st = values_st.replace(']', '}')
                 dbname = 'imagedata_l'
             else:
                 print('Incorrect value for Model provided')
@@ -173,20 +164,13 @@ class imageProcess:
             cur.execute(sql)
             name = os.path.basename(filename)
             name = os.path.splitext(name)[0]
-            # print(name)
             # create a cursor
             sql = "SELECT {field} FROM {db} WHERE {field} = '{condition}';".format(field="imageid",db=dbname,condition=name)
-            # print("SQL Check Exist - HOG: ", sql)
             cur.execute(sql)
 
-            # cur.execute(sql)
             if cur.fetchone() is None:
-                # print("Not Exist HOG - Insert")
                 sql = "INSERT INTO {db} VALUES('{x}', '{y}');".format(x=name,y=values_st, db=dbname)
             else:
-                # print("Exist HOG - Update")
-                # column = "HOG"
-                
                 sql = "UPDATE {db} SET {x} ='{y}' WHERE IMAGEID = '{z}'".format(x='imagedata',y=values_st, z= name, db=dbname)
             
             cur.execute(sql)
@@ -199,17 +183,6 @@ class imageProcess:
     def dbFetch(self, conn, dbname, condition = ""):
         # Create cursor
         cur = conn.cursor()
-        # if model == 's':
-        #     dbname = 'imagedata_sift'
-        # elif model == 'm':
-        #     dbname = 'imagedata_moments'
-        # elif model == 'h':
-        #     dbname = 'imagedata_hog'
-        # elif model == 'l':
-        #     dbname = 'imagedata_lbp'
-        # dbname = 'imagedata_' + model
-        # if condition:
-        #     dbname += "_" + technique
         sql = "SELECT * FROM {db} {condition}".format(db=dbname, condition = condition)
         # print (sql)
         cur.execute(sql)
@@ -217,11 +190,9 @@ class imageProcess:
         return recs
 
     # Method to access the database
-    def dbProcess(self, password, process='s', model='s', host='localhost',
-                  database='postgres', user='postgres', port=5432, dbase = 'imagedata_l'):
+    def dbProcess(self, process='s', model='s', dbase = 'imagedata_h'):
         # Connect to the database
-        db = PostgresDB(password=password, host=host,
-                        database=DATABASE_NAME, user=user, port=port)
+        db = PostgresDB()
         conn = db.connect()
         if process == 's':
             self.dbSave(conn, model)
@@ -232,17 +203,6 @@ class imageProcess:
             # Flatten the data structure and 
             for rec in recs:
                 recs_flt.append((rec[0],np.asarray(eval(rec[1]))))
-            # if model == 'm':
-            #     print(recs)
-            #     for rec in recs:
-            #         recs_flt.append(np.asarray(eval(rec[1])))
-                    # recs_flt.append((rec[0], [float(x) for y in rec[1] for x in y]))
-            # elif model == 's':
-            #     for rec in recs:
-            #         recs_flt.append((rec[0], [[float(x) for x in y] for y in rec[1]]))
-            # elif model == 'l' or model == 'h':
-            #     for rec in recs:
-            #         recs_flt.append((rec[0], [float(x) for x in rec[1]]))
             return recs_flt
 
     # Method to calculate the Cosine Similarity
@@ -250,10 +210,7 @@ class imageProcess:
         dot_product = np.dot(vec1, vec2)
         norm_a = np.linalg.norm(vec1)
         norm_b = np.linalg.norm(vec2)
-        # cos = 1 - (dot_product / (norm_a * norm_b))
-        # return cos
         return ((1 + (dot_product / (norm_a * norm_b)))/2)*100
-        # return 1 - spatial.distance.cosine(vec1, vec2)
 
     # method to calculate Manhattan distance
     def man_dist(self, vec1, vec2):
@@ -268,14 +225,10 @@ class imageProcess:
         return dist
 
     def cosine_similarity(self, imageA, imageB):
-        # print(imageA)
-        # print(imageB)
         return np.dot(imageA, imageB)/(np.sqrt(np.sum(imageA ** 2, axis=0))*np.sqrt(np.sum(imageB ** 2, axis=0)))
     
     # Calculate the Euclidean distance
     def euclidean_distance(self, imageA, imageB):
-        # d=math.sqrt(np.sum([((a-b) ** 2) for (a,b) in zip(imageA,imageB)]))
-        # return d
         return np.sqrt(np.sum((imageA - imageB) ** 2, axis=0))
 
     # Calculate the vector matches
@@ -314,11 +267,8 @@ class imageProcess:
 
     def queryImageNotLabel(self, image_data, feature, technique, label):
         print("Not Same Label")
-        # cursor.execute("SELECT * FROM imagedata_{0}_{1} WHERE imageid = '{2}'".format(feature,technique,image))
-        # image_data = cursor.fetchall()
-        # print(image_data)
         image_data = np.asarray(eval(image_data[0][1]))
-        path = os.path.normpath(os.getcwd()  + os.sep + os.pardir + os.sep + 'Phase1\\Models'  +os.sep)
+        path = self.modelpath
 
         model = joblib.load(path + os.sep + "{0}_{1}_{2}.joblib".format(feature, technique, label))
         
@@ -332,18 +282,14 @@ class imageProcess:
                 histo[idx] += 1/nkp
             image_data = np.asarray(histo)
         image_data = model.transform([image_data])[0]
-
-        # print(np.asarray((model.components_)).shape)
-        # print(image_data)
         return image_data
         
-    def similarity (self, feature, technique, dbase, k, image, label = ""):
-        db = PostgresDB(password = "1Idontunderstand", database = "postgres")
+    def similarity(self, feature, technique, dbase, k, image, label = ""):
+        db = PostgresDB()
         conn = db.connect()
         if conn is None:
             print("Can not connect to database")
             exit()
-        # print(dbase)
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM " + dbase)
         data = cursor.fetchall()
@@ -351,7 +297,6 @@ class imageProcess:
         similarity = {}
         if image in image_id:
             image_index = image_id.index(image)
-            # print(image_index)
             image_data = np.asarray(eval(data[image_index][1]))
         else:
             print("Not Same Label")
@@ -364,18 +309,8 @@ class imageProcess:
         # print (image_id)
         for i in range(len(image_id)):
             image_cmp = np.asarray(eval(data[i][1]))
-            # print(data[i][0])
-            # print(data[i][1])
-            # if self.metrics:
-            #     # similarity[row[0]] = 1- self.cosine_similarity(image, result)
-            #     similarity[image_id[i]] = 1 - st.pearsonr(image,image_cmp)[0]
-            #     # similarity[row[0]] = mean_squared_error(image,result)
-            #     # similarity[row[0]] = 0 - self.psnr(image,result)
-            # else:
             similarity[image_id[i]] =  self.euclidean_distance(image_data,image_cmp)
-        # print(similarity)
         similarity = sorted(similarity.items(), key = lambda x : x[1], reverse=False)
-        # print(similarity)
         self.dispImages(similarity,feature, technique, 11, k, label)
 
     # Method to display images
@@ -388,11 +323,9 @@ class imageProcess:
         fig=plt.figure(figsize=(30, 20))
         fig.canvas.set_window_title('Task 3 - Images Similarity - Euclidean')
         fig.suptitle(str(no_images - 1) + ' Similar Images of ' + similarity[0][0] + ' based on ' + feature + ", "+ str(k) + " latent semantics and " + technique + " " + label)
-        # plt.title(str(no_images - 1) + ' Similar Images of ' + similarity[0][0] + ' based on ' + type,y=-0.01)
         plt.axis('off')
-        # fig.title(str(k) + 'Similar Images of ' + similarity[0][0] + ' based on ' + type)
-        f=open("../Phase1/Outputs/task3_result.txt","w+")
-        f.write("Task 2 - Matching Score " + str(no_images) + " images with " + similarity[0][0] + ' based on ' + feature + ", "+ str(k) + " latent semantics and " + technique + ":\n")
+        f=open("../Phase1/Outputs/task_result.txt","w+")
+        f.write("Task - Matching Score " + str(no_images) + " images with " + similarity[0][0] + ' based on ' + feature + ", "+ str(k) + " latent semantics and " + technique + ":\n")
         for i in range(no_images):
             f.write(similarity[i][0] + ": " + str(similarity[i][1]) + "\n")
             img = mpimg.imread(self.dirpath + self.ext.replace('*', similarity[i][0]))
@@ -404,7 +337,7 @@ class imageProcess:
                     ax[-1].set_title("Image "+str(i) + ": " +similarity[i][0] + '\nScore: ' + str(float(similarity[i][1])))  # set title
             ax[-1].axis('off')
             plt.imshow(img)
-        plt.savefig('../Phase1/Outputs/task2_result.png')
+        plt.savefig('../Phase1/Outputs/task_result.png')
         f.close()
         plt.show()
         plt.close()
@@ -443,8 +376,7 @@ class imageProcess:
     
     
     def readMetaData(self):
-        # print(self.dirpath + csvFile)
-        with open(self.dirpath + csvFile, 'r') as file:
+        with open(self.metapath, 'r') as file:
             csv_reader = csv.reader(file)
             meta_file = []
             for idx, row in enumerate(csv_reader):
@@ -477,40 +409,8 @@ class imageProcess:
         cur = conn.cursor()
         sqli = "SELECT image_id, imagedata from img_meta INNER JOIN {db} ON image_id = imageid WHERE {field} = '{label}'".format(field=field, label=label, db = dbase)
         cur.execute(sqli)
-        filteredImage = [(x[0],eval(x[1])) for x in cur.fetchall()]
-        # print(filteredImage)
-        # if label in ("dorsal", "palmar", "left", "right"):
-        #     index = "aspectOfHand"
-        # elif label in ("male", "female"):
-        #     index = "gender"
-        # elif label in ("with accessories", "without accessories"):
-        #     index = "accessories"
-        # else:
-        #     index = ""
-        # print(self.dirpath + csvFile)
-        # print(index)
-        # with open('/home/anhnguyen/ASU/CSE-515/Project/Phase 2/Project - Phase 2/Data/testset1/HandInfo.csv', 'r', newline='') as f:
-        #     reader = csv.reader(f, delimiter=',')
-        #     # next(cr) gets the header row (row[0])
-        #     header = next(reader)
-        #     i = header.index(index)
-        #     id = header.index("imageName")
-        #     # print(i,index)
-        #     # list comprehension through remaining cr iterables
-        #     if index in ("aspectOfHand", "gender"):
-        #         filteredImage = [row[id][:len(row[id]) - 4] for row in reader if row[i].find(label) != -1]
-        #     elif label == "with accessories":
-        #         filteredImage = [row[id][:len(row[id]) - 4] for row in reader if row[i] == '1']
-        #     elif label == "without accessories":
-        #         filteredImage = [row[id][:len(row[id]) - 4] for row in reader if int(row[i]) == '0']
-        #     # else:
-        #     #     return data, header
-        # # print (filteredImage)
+        filteredImage = [(x[0],np.asarray(eval(x[1]))) for x in cur.fetchall()]
         return filteredImage
 
-# phase1 = imageProcess("/home/anhnguyen/ASU/CSE-515/Project/Phase 2/Project - Phase 2/Data/Dataset2/")
-# for m in ('l', 'm', 'h'):
-#     print(m)
-#     phase1.dbProcess(password = "abcdefgh", model = m, process = "s")
 
 
