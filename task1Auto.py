@@ -8,7 +8,7 @@ dim = dimReduction(path, '*.jpg')
 for feature in ['m', 'l', 'h', 's']:
     for technique in ['pca', 'nmf', 'lda', 'svd']:
         db = 'imagedata_' + feature
-        imgs_sort, feature_sort = dim.saveDim(feature, technique, db, 10, password="abcdefgh", database="mwdb")
+        imgs_sort, feature_sort = dim.saveDim(feature, technique, db, 20)
         path = os.path.normpath(os.getcwd() + os.sep + os.pardir + os.sep + 'Outputs'  +os.sep)
         # print(path)
         # print('\n')

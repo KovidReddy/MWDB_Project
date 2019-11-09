@@ -5,13 +5,13 @@ arg = input("Which task would you like to run (1/2/3)? ")
 if arg == '1':
     for x in ['s', 'l', 'h', 'm']:
         print(x)
-        ip.dbProcess(password='1Idontunderstand', model=x, process='s')
+        ip.dbProcess(model=x, process='s')
 
 elif arg == '2':
     inp1 = input("Would you like to fetch SIFT features or Moment features (s/m)?")
     inp = input("Provide the image ID which you would like to display:")
 
-    rec = ip.dbProcess(password='password', model=inp1, process='f')
+    rec = ip.dbProcess(model=inp1, process='f')
     rec_arr = np.array(rec[0][1])
     print('Features:', np.array(rec_arr))
     print('Size', rec_arr.shape)
