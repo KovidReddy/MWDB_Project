@@ -4,6 +4,9 @@ from clustering import KMeans
 import glob
 import numpy as np
 import os
+import SVM as sv
+from SVM import SVM
+
 class classify(dimReduction):
     def __init__(self, feature='h', dim='svd', k=20):
         super().__init__(ext='*.jpg')
@@ -162,8 +165,6 @@ class classify(dimReduction):
         test_ids_st = test_ids_st.replace('}', ')')
         cur.execute("SELECT image_id, aspect FROM img_meta WHERE image_id IN {0}".format(test_ids_st))
         labels = cur.fetchall()
-        cnt_d = 0
-        cnt_p = 0
         cnt = 0
         for idx, test in enumerate(test_data):
             cnt_d = 0
@@ -184,5 +185,35 @@ class classify(dimReduction):
 
         print('Accuracy: ', cnt/len(test_data))
 
+    # Function to use SVM to classify images as palmar and dorsal
+    def svmClassify(self):
+        # Check if tables exist otherwise create them
+        self.checkCreate()
+        # Now segregate the content between dorsal and palmar
+        dorsal_ids, dorsal_data = self.fetchAspect('dorsal')
+        palmar_ids, palmar_data = self.fetchAspect('palmar')
+        svm_data = np.vstack((np.array(dorsal_data), np.array(palmar_data)))
+        y1_test = [1.0 for _ in range(len(dorsal_data))]
+        y2_test = [-1.0 for _ in range(len(palmar_data))]
+        svm_labels = np.hstack((y1_test, y2_test))
+        # Perform SVM
+        svm = SVM(kernel=sv.gaussian_kernel,C=1000.1)
+        svm.fit(svm_data, svm_labels)
+        # Fetch the test data set and transform them into feature space
+        test_ids, test_data = self.fetchTestData()
+
+        # Fetch the labels for the images
+        cur = self.conn.cursor()
+        test_ids_st = str(set(test_ids)).replace('{', '(')
+        test_ids_st = test_ids_st.replace('}', ')')
+        cur.execute("SELECT image_id, aspect FROM img_meta WHERE image_id IN {0}".format(test_ids_st))
+        labels = cur.fetchall()
+        labels = np.array([-1.0 if x == 'palmar' else 1.0 for x in labels])
+
+        # Calculate accuracy
+        y_pred = svm.predict(test_data)
+        correct = np.sum(y_pred == labels)
+        print(correct/len(test_data))
+
 c = classify()
-c.clusterClassify()
+c.svmClassify()

@@ -31,15 +31,16 @@ class imageProcess:
                 meta = js['meta']
                 ogpath = js['ogpath']
                 outputs = js['outputs']
+                test = js['test']
 
         except Exception as error:
             print(error)
             exit(-1)
 
-        return dataset, model, meta, ogpath, outputs
+        return dataset, model, meta, ogpath, outputs, test
 
     def __init__(self, ext='*.jpg'):
-        self.dirpath, self.modelpath, self.metapath, self.ogpath, self.outpath = self.paths()
+        self.dirpath, self.modelpath, self.metapath, self.ogpath, self.outpath, self.testpath = self.paths()
         self.ext = ext
 
     # Method to fetch images as pixels
@@ -309,7 +310,7 @@ class imageProcess:
         # print (image_id)
         for i in range(len(image_id)):
             image_cmp = np.asarray(eval(data[i][1]))
-            similarity[image_id[i]] =  self.euclidean_distance(image_data,image_cmp)
+            similarity[image_id[i]] = self.euclidean_distance(image_data,image_cmp)
         similarity = sorted(similarity.items(), key = lambda x : x[1], reverse=False)
         self.dispImages(similarity,feature, technique, 11, k, label)
 
