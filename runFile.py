@@ -1,18 +1,17 @@
 import imageProcess
 import numpy as np
-ip = imageProcess.imageProcess(dirpath='C:\\ASU\\Fall 2019\\MWDB\\Project\\Phase 2\\Dataset2\\')
+ip = imageProcess.imageProcess()
 arg = input("Which task would you like to run (1/2/3)? ")
 if arg == '1':
-    # inp = input("Would you like to save SIFT features or Moment features (s/m)?")
-    for inp in ['s', 'm', 'l', 'h']:
-        print(inp)
-        ip.dbProcess(password='password', model=inp, process='s')
+    for x in ['h', 's', 'l', 'm']:
+        print(x)
+        ip.dbProcess(model=x, process='s')
 
 elif arg == '2':
     inp1 = input("Would you like to fetch SIFT features or Moment features (s/m)?")
     inp = input("Provide the image ID which you would like to display:")
 
-    rec = ip.dbProcess(password='password', model=inp1, process='f')
+    rec = ip.dbProcess(model=inp1, process='f')
     rec_arr = np.array(rec[0][1])
     print('Features:', np.array(rec_arr))
     print('Size', rec_arr.shape)

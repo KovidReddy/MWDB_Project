@@ -33,3 +33,8 @@ Run Instructions:
 3. Enter the Image ID of interest.
 4. Enter the Number of Similar Images you would like to return.
 5. Check Output folder for results.
+
+
+Notice:
+We should create the Models folder before running tasks. It should be same level as MWDB_Project folder
+HandInfo.csv file should be put inside the working path

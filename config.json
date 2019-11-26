@@ -1,0 +1,7 @@
+{
+  "host":"localhost",
+  "database": "mwdb",
+  "user": "postgres",
+  "port": "5432",
+  "password": "mynhandepg"
+}

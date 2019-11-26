@@ -1,0 +1,8 @@
+{
+  "dataset":"/home/anhnguyen/ASU/CSE-515/Project/Phase 3/phase3_sample_data/Labelled/Set2/",
+  "model": "/home/anhnguyen/ASU/CSE-515/Project/Phase 3/Model/",
+  "meta": "C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Dataset\\HandInfo.csv",
+  "outputs": "C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Outputs",
+  "ogpath": "C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Hands\\",
+  "test": "/home/anhnguyen/ASU/CSE-515/Project/Phase 3/phase3_sample_data/Unlabelled/Set 1/"
+}
