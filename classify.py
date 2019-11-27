@@ -4,11 +4,12 @@ from clustering import KMeans
 import glob
 import numpy as np
 import os
-import SVM as sv
+import SVM
 from SVM import SVM
-
+from LSH import LSH
+import tqdm
 class classify(dimReduction):
-    def __init__(self, feature='h', dim='svd', k=20):
+    def __init__(self, feature='l', dim='svd', k=20):
         super().__init__(ext='*.jpg')
         db = PostgresDB()
         self.conn = db.connect()
@@ -51,10 +52,14 @@ class classify(dimReduction):
             exit(-1)
 
     # Fetch data for a single aspect
-    def fetchAspect(self, aspect):
+    def fetchAspect(self, aspect, red=False):
         cur = self.conn.cursor()
+        if red:
+            table = self.table_d
+        else:
+            table = self.table_f
         cur.execute("SELECT imageid, imagedata FROM {0} t1 INNER JOIN img_meta t2 "
-                    "ON t1.imageid = t2.image_id AND t2.aspect = '{1}'".format(self.table_f, aspect))
+                    "ON t1.imageid = t2.image_id AND t2.aspect = '{1}'".format(table, aspect))
         imgs = cur.fetchall()
         # Separate Image IDs and Image data
         ids = []
@@ -197,7 +202,7 @@ class classify(dimReduction):
         y2_test = [-1.0 for _ in range(len(palmar_data))]
         svm_labels = np.hstack((y1_test, y2_test))
         # Perform SVM
-        svm = SVM(kernel=sv.gaussian_kernel,C=1000.1)
+        svm = SVM(C=1000.1)
         svm.fit(svm_data, svm_labels)
         # Fetch the test data set and transform them into feature space
         test_ids, test_data = self.fetchTestData()
@@ -215,5 +220,99 @@ class classify(dimReduction):
         correct = np.sum(y_pred == labels)
         print(correct/len(test_data))
 
+    # Fetch 11K images
+    def fetch11KImages(self):
+        # Check if table exists for 11 K images
+        cur = self.conn.cursor()
+        # Check if table already exists
+        cur.execute("SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name = 'imagedata_11k_{0}')".format(self.feature))
+        tflg = cur.fetchone()
+        if not tflg[0]:
+            print('Loading 11K images to the database...')
+            # Fetch images as pixels
+            filecnt = len(glob.glob(self.ogpath + self.ext))
+            pbar = tqdm.tqdm(total=filecnt)
+            dbname = 'imagedata_11K_'+self.feature
+            for filename in glob.glob(self.ogpath + self.ext):
+                if self.feature == 'l':
+                    h_val = self.lbp_preprocess(filename)
+                elif self.feature == 'h':
+                    h_val = self.hog_process(filename)
+                values_st = str(np.asarray(h_val).tolist())
+                name = os.path.basename(filename)
+                name = os.path.splitext(name)[0]
+                sql = "CREATE TABLE IF NOT EXISTS {db} (imageid TEXT NOT NULL, imagedata TEXT, PRIMARY KEY (imageid))".format(
+                    db=dbname)
+                cur.execute(sql)
+                # create a cursor
+                sql = "SELECT {field} FROM {db} WHERE {field} = '{condition}';".format(field="imageid", db=dbname,
+                                                                                       condition=name)
+                cur.execute(sql)
+                if cur.fetchone() is None:
+                    sql = "INSERT INTO {db} VALUES('{x}', '{y}');".format(x=name, y=values_st, db=dbname)
+                else:
+                    pass
+                cur.execute(sql)
+                self.conn.commit()
+                # close cursor
+                pbar.update(1)
+        else:
+            print('11K imagedata already loaded into the Database')
+            # Read data from Table
+        cur.execute("SELECT * FROM imagedata_11K_{0}".format(self.feature))
+        data = cur.fetchall()
+        img_dict = {}
+        for d in data:
+            img_dict[d[0]] = eval(d[1])
+        self.conn.commit()
+        cur.close()
+        return img_dict
+
+    # Method to use LSH to classify
+    def lshClassify(self, n=10, label='Hand_0000002', k=5, l=3):
+        # Check if tables exist otherwise create them
+        img_dict = self.fetch11KImages()
+        lsh = LSH(L=l, k=k)
+        index = lsh.fit(list(img_dict.values()), list(img_dict.keys()))
+        neighbors = lsh.NNSearch(list(img_dict.keys()), index, label)
+
+        # Perform Naive KNN
+        distances = sorted([(n,self.simMetric(np.array(img_dict[label]), np.array(img_dict[n]))) for n in neighbors], key=lambda x:x[0])[0:n]
+        nearest = [x[0] for x in distances]
+        print('The Nearest Images to {0} are : '.format(label), nearest)
+        lsh.display_images(nearest)
+
+        return [(x,img_dict[x]) for x in nearest], [(x,img_dict[x]) for x in neighbors]
+
+    # Method to perform Relevance Feedback based ranking
+    def relevanceFeedback(self, n=10, label='Hand_0000002', k=5, l=3):
+        # Perform Task 5 to get outputs
+        nearest, neighbors = self.lshClassify(n=n, label=label, k=k, l=l)
+
+        # Input of each image as Relevant or Irrelevant
+        print('Please provide feedback for each of the nearest Images (Relevant - R/ Irrelevant - I): ')
+        feedback = []
+        for x,y in nearest:
+            ir = input('{0}'.format(x))
+            if ir == 'R':
+                feedback.append(1)
+            else:
+                feedback.append(-1)
+        algo = input('Please choose the algorithm for the feedback mechanism: (SVM -svm, Decision Tree -dt, PPR -ppr, Probability -prob)')
+
+        if algo == 'svm':
+            svm = SVM(C=1000.1)
+            svm_data = np.array([x[1] for x in nearest])
+            svm_labels = np.array(feedback)
+            svm.fit(svm_data, svm_labels)
+            y_pred = svm.predict([x[1] for x in neighbors])
+            indices = [i for i, x in enumerate(y_pred) if x == 1]
+            new_neighbors = [neighbors[i] for i in indices]
+            distances = sorted([(n, self.simMetric(np.array(label), np.array(n))) for label, n in new_neighbors], key=lambda x: x[0])[0:n]
+            new_nearest = [x[0] for x in distances]
+            print('The New Nearest Images to {0} are : '.format(label), new_nearest)
+
+
+
 c = classify()
-c.svmClassify()
+c.lshClassify()
