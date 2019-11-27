@@ -8,6 +8,7 @@ import SVM
 from SVM import SVM
 from LSH import LSH
 import tqdm
+import math
 class classify(dimReduction):
     def __init__(self, feature='l', dim='svd', k=20):
         super().__init__(ext='*.jpg')
@@ -284,6 +285,32 @@ class classify(dimReduction):
 
         return [(x,img_dict[x]) for x in nearest], [(x,img_dict[x]) for x in neighbors]
 
+    def probRelFeedback(self, relevant, irrelevant, neighbors):
+        # First convert the image data into binary values
+        bin_data = []
+        labels = []
+        for d in neighbors:
+            threshold = np.mean(d[1])
+            bin_data.append([1 if x > threshold else 0 for x in d[1]])
+            labels.append(d[0])
+        bin_data = list(zip(labels,bin_data))
+        relevant_vals = np.array([x[1] for x in relevant])
+        irrelevant_vals = np.array([x[1] for x in irrelevant])
+        # Now calculate the parameters for probability calculation
+        r = relevant_vals.sum(axis=0)
+        ir = irrelevant_vals.sum(axis=0)
+        R = len(relevant)
+        IR = len(irrelevant)
+        # Calculate the probability scores for each of the neighbors
+        scores = []
+        print('Calculating Probability Scores...')
+        for lab, n in bin_data:
+            prob_score = np.sum([x * math.log((r[i]/(R - r[i])) + 0.5 / ((ir[i]/(IR - ir[i])) + 0.5)) for i, x in enumerate(n)])
+            scores.append((lab, prob_score))
+        # Sort the images by their probability scores
+        scores = sorted(scores, key=lambda x: x[1], reverse=True)
+        return scores
+
     # Method to perform Relevance Feedback based ranking
     def relevanceFeedback(self, n=10, label='Hand_0000002', k=5, l=3):
         # Perform Task 5 to get outputs
@@ -293,7 +320,7 @@ class classify(dimReduction):
         print('Please provide feedback for each of the nearest Images (Relevant - R/ Irrelevant - I): ')
         feedback = []
         for x,y in nearest:
-            ir = input('{0}'.format(x))
+            ir = input('{0}: '.format(x))
             if ir == 'R':
                 feedback.append(1)
             else:
@@ -312,7 +339,14 @@ class classify(dimReduction):
             new_nearest = [x[0] for x in distances]
             print('The New Nearest Images to {0} are : '.format(label), new_nearest)
 
-
+        elif algo == 'prob':
+            rel_indices = [i for i, x in enumerate(feedback) if x == 1]
+            relevant = [nearest[i] for i in rel_indices]
+            irel_indices = [i for i, x in enumerate(feedback) if x == 1]
+            irrelevant = [nearest[i] for i in irel_indices]
+            scores = self.probRelFeedback(relevant, irrelevant, neighbors)
+            new_nearest = [x[0] for x in scores[0:n]]
+            print('The New Nearest Images to {0} are : '.format(label), new_nearest)
 
 c = classify()
-c.lshClassify()
+c.relevanceFeedback()
