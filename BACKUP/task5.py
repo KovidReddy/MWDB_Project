@@ -14,10 +14,10 @@ if feature not in ('s', 'm', 'l', 'h'):
 technique = input('Please choose a dimensionality reduction technique - PCA(pca), SVD(svd), NMF(nmf), LDA(lda): ')
 k = input('Please provide the number of latent semantics(k): ')
 label = input('Please provide the label: ')
-db = PostgresDB(password='mynhandepg', host='localhost',
-                        database='mwdb', user='postgres', port=5432)
+db = PostgresDB(password='1Idontunderstand', host='localhost',
+                        database='postgres', user='postgres', port=5432)
 conn = db.connect()
-x =dim.classifyImgDeTree(conn, feature, image, label, technique)
+x =dim.classifyImg(conn, feature, image, label, technique)
 if x[0] == 1:
     print('Image {id} belongs to label {l}'.format(id=image, l=label))
 else:

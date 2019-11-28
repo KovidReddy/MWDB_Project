@@ -1,9 +1,9 @@
 import imageProcess
 import numpy as np
-ip = imageProcess.imageProcess()
+ip = imageProcess.imageProcess('C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Dataset\\')
 arg = input("Which task would you like to run (1/2/3)? ")
 if arg == '1':
-    for x in ['h', 's', 'l', 'm']:
+    for x in ['s', 'l', 'h', 'm']:
         print(x)
         ip.dbProcess(model=x, process='s')
 

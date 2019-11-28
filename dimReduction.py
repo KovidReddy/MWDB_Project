@@ -383,14 +383,16 @@ class dimReduction(imageProcess):
         label = label.replace(" ", "_")
         db_feature = 'imagedata_' + feature + '_' + dim + '_' + label
         cur = conn.cursor()
-        sqlj = "SELECT imageid, imagedata FROM {db}".format(db=db_feature)
+        sqlj = "SELECT imageid, imagedata, aspect FROM {db}, {meta} WHERE {db}.imageid = {meta}.image_id".format(db=db_feature, meta ="img_meta")
         cur.execute(sqlj)
         label_data = cur.fetchall()
         recs_flt = []
         img_meta = []
+        label = []
         for rec in label_data:
             recs_flt.append(eval(rec[1]))
             img_meta.append(rec[0])
+            label.append(rec[2])
         # sqlm = "SELECT image_id FROM img_meta WHERE subjectid = '{s}'".format(s=subject)
         image = self.singleImageFetch(img=img, feature=feature)
 
@@ -496,51 +498,4 @@ class dimReduction(imageProcess):
 
         imgs_red = list(zip(imgs_meta, imgs_red))
         self.createInsertDB(dbase, imgs_red, conn)
-        return imgs_sort, feature_sort
-
-    def classifyImgDeTree(self, conn, feature, img, label, dim):
-        # fetch image dataset
-        label = label.replace(" ", "_")
-        db_feature = 'imagedata_' + feature + '_' + dim + '_' + label
-        cur = conn.cursor()
-        sqlj = "SELECT imageid, imagedata, aspect FROM {db}, {meta} WHERE {db}.imageid = {meta}.image_id".format(db=db_feature, meta ="img_meta")
-        cur.execute(sqlj)
-        label_data = cur.fetchall()
-        recs_flt = []
-        img_meta = []
-        label = []
-        for rec in label_data:
-            recs_flt.append(eval(rec[1]))
-            img_meta.append(rec[0])
-            label.append(rec[2])
-        # sqlm = "SELECT image_id FROM img_meta WHERE subjectid = '{s}'".format(s=subject)
-        image = self.singleImageFetch(img=img, feature=feature)
-
-        # Check for which reduced dimension technique is being used
-        path = self.modelpath
-        model = joblib.load(path + os.sep + "{0}_{1}_{2}.joblib".format(feature, dim, label))
-        imgs_red = np.append(np.asarray(recs_flt), np.asarray(label), axis=1)
-        print(imgs_red)
-        tree = DecisionTree()
-        my_tree = tree.build_tree(imgs_red)
-        exit(1)
-        clf = svm.OneClassSVM(nu=0.1, kernel='rbf', gamma=1)
-        clf.fit(imgs_red)
-        image = np.asarray(image)
-        # print(image.shape)
-        if feature == 's' or (feature == 'm' and dim in ('nmf', 'lda')):
-            kmeans = joblib.load(path + os.sep + 'kmeans_{0}_{1}_{2}.joblib'.format(model.components_.shape[1], feature, label))
-            histo = np.zeros(model.components_.shape[1])
-            nkp = image.shape[0]
-            for d in image:
-                idx = kmeans.predict([d])
-                histo[idx] += 1/nkp
-            image = np.asarray(histo)
-        else:
-            image = image.reshape((-1))
-        if dim == 'pca':
-            image = model.transform([image])
-        else:
-            image = np.dot(image, model.components_.T)
-        pred = clf.predict(image.reshape(1,-1))
-        return pred
+        return imgs_sort, feature_sort, U, Vt
