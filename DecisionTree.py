@@ -16,8 +16,9 @@ from __future__ import print_function
 
 
 class DecisionTree:
-    def __init__(self):
-        pass
+    def __init__(self, max_depth = 10, min_support = 5):
+        self.max_depth = max_depth
+        self.min_support = min_support
     def unique_vals(self, rows, col):
         """Find the unique values for a column in a dataset."""
         return set([row[col] for row in rows])
@@ -53,39 +54,42 @@ class DecisionTree:
     # is_numeric("Red")
     #######
 
-    def build_tree(self, rows):
+    def build_tree(self, rows, depth = 0):
         """Builds the tree.
         Rules of recursion: 1) Believe that it works. 2) Start by checking
         for the base case (no further information gain). 3) Prepare for
         giant stack traces.
         """
 
-        # Try partitioing the dataset on each of the unique attribute,
-        # calculate the information gain,
-        # and return the question that produces the highest gain.
-        gain, question = self.find_best_split(rows)
+        if depth <= self.max_depth and len(rows) >= self.min_support:
+            # Try partitioing the dataset on each of the unique attribute,
+            # calculate the information gain,
+            # and return the question that produces the highest gain.
+            gain, question = self.find_best_split(rows)
 
-        # Base case: no further info gain
-        # Since we can ask no further questions,
-        # we'll return a leaf.
-        if gain == 0:
-            return Leaf(rows)
+            # Base case: no further info gain
+            # Since we can ask no further questions,
+            # we'll return a leaf.
+            if gain == 0:
+                return Leaf(rows)
 
-        # If we reach here, we have found a useful feature / value
-        # to partition on.
-        true_rows, false_rows = self.partition(rows, question)
+            # If we reach here, we have found a useful feature / value
+            # to partition on.
+            true_rows, false_rows = self.partition(rows, question)
 
-        # Recursively build the true branch.
-        true_branch = self.build_tree(true_rows)
+            # Recursively build the true branch.
+            true_branch = self.build_tree(true_rows, depth + 1)
 
-        # Recursively build the false branch.
-        false_branch = self.build_tree(false_rows)
+            # Recursively build the false branch.
+            false_branch = self.build_tree(false_rows, depth + 1)
 
         # Return a Question node.
         # This records the best feature / value to ask at this point,
         # as well as the branches to follow
         # dependingo on the answer.
-        return Decision_Node(question, true_branch, false_branch)
+            return Decision_Node(question, true_branch, false_branch)
+        else:
+            return Leaf(rows)
 
 
     def print_tree(self, node, spacing=""):

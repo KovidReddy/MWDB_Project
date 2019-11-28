@@ -496,7 +496,7 @@ class dimReduction(imageProcess):
 
         imgs_red = list(zip(imgs_meta, imgs_red))
         self.createInsertDB(dbase, imgs_red, conn)
-        return imgs_sort, feature_sort, U, Vt
+        return imgs_sort, feature_sort
 
     def classifyImgDeTree(self, conn, feature, img, label, dim):
         # fetch image dataset
