@@ -10,6 +10,9 @@ from SVM import SVM
 from DecisionTree import DecisionTree
 import joblib
 import matplotlib.pyplot as plt
+from LSH import LSH
+import tqdm
+import math
 
 class classify(dimReduction):
     def __init__(self, feature='l', dim='pca', k=20):
@@ -140,12 +143,25 @@ class classify(dimReduction):
         dorsal_ids, dorsal_data = self.fetchAspect('dorsal')
         palmar_ids, palmar_data = self.fetchAspect('palmar')
 
-        # Perfrom SVD and get the Feature Latent Semantics for both dorsal and palmar
-        _, _, lsDorsal = self.svd(dorsal_data, self.k, self.feature + '_' + self.dim + '_' + 'dorsal')
-        _,_, lsPalmar = self.svd(palmar_data, self.k, self.feature + '_' + self.dim + '_' + 'palmar')
+        if self.dim == "svd":
+            # Perfrom SVD and get the Feature Latent Semantics for both dorsal and palmar
+            _, _, lsDorsal = self.svd(dorsal_data, self.k, self.feature + '_' + self.dim + '_' + 'dorsal')
+            _,_, lsPalmar = self.svd(palmar_data, self.k, self.feature + '_' + self.dim + '_' + 'palmar')
 
+        elif self.dim == "pca":
+            # Perfrom SVD and get the Feature Latent Semantics for both dorsal and palmar
+            _, _, lsDorsal = self.pca(dorsal_data, self.k, self.feature + '_' + self.dim + '_' + 'dorsal')
+            _,_, lsPalmar = self.pca(palmar_data, self.k, self.feature + '_' + self.dim + '_' + 'palmar')
+        elif self.dim == "nmf":
+            _, lsDorsal = self.nmf(dorsal_data, self.k, self.feature + '_' + self.dim + '_' + 'dorsal')
+            _, lsPalmar  = self.nmf(palmar_data, self.k, self.feature + '_' + self.dim + '_' + 'palmar')
+
+        elif self.dim == "lda":
+            _, lsDorsal = self.lda(dorsal_data, self.k, self.feature + '_' + self.dim + '_' + 'dorsal')
+            _, lsPalmar  = self.lda(palmar_data, self.k, self.feature + '_' + self.dim + '_' + 'palmar')
+        
         # Fetch the test data set and transform them into feature space
-        test_ids, test_data = self.fetchTestData()
+        test_data, test_ids, test_label = self.fetchTestData()
         test_data = np.asarray(test_data)
 
         # Fetch the labels for the images
@@ -191,7 +207,7 @@ class classify(dimReduction):
         centroids = dorsal_centroids + palmar_centroids
 
         # Fetch the test data set and transform them into feature space
-        test_ids, test_data = self.fetchTestData()
+        test_data, test_ids, test_label = self.fetchTestData()
         test_data = np.asarray(test_data)
 
         # Fetch the labels for the images
@@ -444,12 +460,144 @@ class classify(dimReduction):
         print("Result:", float(count / len(imgs_test)))
         return float(count / len(imgs_test))
 
+   # Method to use LSH to classify
+    def lshClassify(self, n=10, label='Hand_0000002', k=5, l=3):
+        # Check if tables exist otherwise create them
+        img_dict = self.fetch11KImages()
+        lsh = LSH(L=l, k=k)
+        index = lsh.fit(list(img_dict.values()), list(img_dict.keys()))
+        neighbors = lsh.NNSearch(list(img_dict.keys()), index, label)
+
+        # Perform Naive KNN
+        distances = sorted([(n,self.simMetric(np.array(img_dict[label]), np.array(img_dict[n]))) for n in neighbors], key=lambda x:x[0])[0:n]
+        nearest = [x[0] for x in distances]
+        print('The Nearest Images to {0} are : '.format(label), nearest)
+        lsh.display_images(nearest)
+
+        return [(x,img_dict[x]) for x in nearest], [(x,img_dict[x]) for x in neighbors]
+
+    def probRelFeedback(self, relevant, irrelevant, neighbors):
+        # First convert the image data into binary values
+        bin_data = []
+        labels = []
+        for d in neighbors:
+            threshold = np.mean(d[1])
+            bin_data.append([1 if x > threshold else 0 for x in d[1]])
+            labels.append(d[0])
+        bin_data = list(zip(labels,bin_data))
+        relevant_vals = np.array([x[1] for x in relevant])
+        irrelevant_vals = np.array([x[1] for x in irrelevant])
+        # Now calculate the parameters for probability calculation
+        r = relevant_vals.sum(axis=0)
+        ir = irrelevant_vals.sum(axis=0)
+        R = len(relevant)
+        IR = len(irrelevant)
+        # Calculate the probability scores for each of the neighbors
+        scores = []
+        print('Calculating Probability Scores...')
+        for lab, n in bin_data:
+            prob_score = np.sum([x * math.log((r[i]/(R - r[i])) + 0.5 / ((ir[i]/(IR - ir[i])) + 0.5)) for i, x in enumerate(n)])
+            scores.append((lab, prob_score))
+        # Sort the images by their probability scores
+        scores = sorted(scores, key=lambda x: x[1], reverse=True)
+        return scores
+
+    # Method to perform Relevance Feedback based ranking
+    def relevanceFeedback(self, n=10, label='Hand_0000002', k=5, l=3):
+        # Perform Task 5 to get outputs
+        nearest, neighbors = self.lshClassify(n=n, label=label, k=k, l=l)
+
+        # Input of each image as Relevant or Irrelevant
+        print('Please provide feedback for each of the nearest Images (Relevant - R/ Irrelevant - I): ')
+        feedback = []
+        for x,y in nearest:
+            ir = input('{0}: '.format(x))
+            if ir == 'R':
+                feedback.append(1)
+            else:
+                feedback.append(-1)
+        algo = input('Please choose the algorithm for the feedback mechanism: (SVM -svm, Decision Tree -dt, PPR -ppr, Probability -prob)')
+
+        if algo == 'svm':
+            svm = SVM(C=1000.1)
+            svm_data = np.array([x[1] for x in nearest])
+            svm_labels = np.array(feedback)
+            svm.fit(svm_data, svm_labels)
+            y_pred = svm.predict([x[1] for x in neighbors])
+            indices = [i for i, x in enumerate(y_pred) if x == 1]
+            new_neighbors = [neighbors[i] for i in indices]
+            distances = sorted([(n, self.simMetric(np.array(label), np.array(n))) for label, n in new_neighbors], key=lambda x: x[0])[0:n]
+            new_nearest = [x[0] for x in distances]
+            print('The New Nearest Images to {0} are : '.format(label), new_nearest)
+
+        elif algo == 'prob':
+            rel_indices = [i for i, x in enumerate(feedback) if x == 1]
+            relevant = [nearest[i] for i in rel_indices]
+            irel_indices = [i for i, x in enumerate(feedback) if x == 1]
+            irrelevant = [nearest[i] for i in irel_indices]
+            scores = self.probRelFeedback(relevant, irrelevant, neighbors)
+            new_nearest = [x[0] for x in scores[0:n]]
+            print('The New Nearest Images to {0} are : '.format(label), new_nearest)
+        
+    # Fetch 11K images
+    def fetch11KImages(self):
+        # Check if table exists for 11 K images
+        cur = self.conn.cursor()
+        # Check if table already exists
+        cur.execute("SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name = 'imagedata_11k_{0}')".format(self.feature))
+        tflg = cur.fetchone()
+        if not tflg[0]:
+            print('Loading 11K images to the database...')
+            # Fetch images as pixels
+            filecnt = len(glob.glob(self.ogpath + self.ext))
+            pbar = tqdm.tqdm(total=filecnt)
+            dbname = 'imagedata_11K_'+self.feature
+            for filename in glob.glob(self.ogpath + self.ext):
+                if self.feature == 'l':
+                    h_val = self.lbp_preprocess(filename)
+                elif self.feature == 'h':
+                    h_val = self.hog_process(filename)
+                values_st = str(np.asarray(h_val).tolist())
+                name = os.path.basename(filename)
+                name = os.path.splitext(name)[0]
+                sql = "CREATE TABLE IF NOT EXISTS {db} (imageid TEXT NOT NULL, imagedata TEXT, PRIMARY KEY (imageid))".format(
+                    db=dbname)
+                cur.execute(sql)
+                # create a cursor
+                sql = "SELECT {field} FROM {db} WHERE {field} = '{condition}';".format(field="imageid", db=dbname,
+                                                                                       condition=name)
+                cur.execute(sql)
+                if cur.fetchone() is None:
+                    sql = "INSERT INTO {db} VALUES('{x}', '{y}');".format(x=name, y=values_st, db=dbname)
+                else:
+                    pass
+                cur.execute(sql)
+                self.conn.commit()
+                # close cursor
+                pbar.update(1)
+        else:
+            print('11K imagedata already loaded into the Database')
+            # Read data from Table
+        cur.execute("SELECT * FROM imagedata_11K_{0}".format(self.feature))
+        data = cur.fetchall()
+        img_dict = {}
+        for d in data:
+            img_dict[d[0]] = eval(d[1])
+        self.conn.commit()
+        cur.close()
+        return img_dict
 feature = input('Please choose a feature model - SIFT(s), Moments(m), LBP(l), Histogram(h): ')
 if feature not in ('s', 'm', 'l', 'h'):
     print('Please enter a valid feature model!')
     exit()
-c = classify(feature = feature)
+technique = input('Please choose a dimensionality reduction technique - PCA(pca), SVD(svd), NMF(nmf), LDA(lda): ')
 
+c = classify(feature = feature, dim= technique)
+# c.relevanceFeedback()
+# c.clusterClassify()
+
+c.LSAnalysis()
+exit(1)
 # c.svmClassify()
 
 obj_list = []
@@ -486,3 +634,6 @@ plt.show()
 
 # svm = SVM() # Linear Kernel
 # svm.fit(data=data_dict)
+
+
+

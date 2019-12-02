@@ -1,8 +1,8 @@
 {
   "dataset":"C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Dataset\\",
-  "model": "C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Models\\",
+  "model": "/home/anhnguyen/ASU/CSE-515/Project/Phase 3/Model/",
   "meta": "C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Dataset\\HandInfo.csv",
-  "outputs": "C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Outputs",
-  "ogpath": "C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Hands\\",
+  "outputs": "/home/anhnguyen/ASU/CSE-515/Project/Phase 3/Outputs/",
+  "ogpath": "/home/anhnguyen/ASU/CSE-515/Project/Phase 1/Hands/",
   "test": "C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Hands_test2\\"
 }

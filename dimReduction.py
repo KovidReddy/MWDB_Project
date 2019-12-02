@@ -106,8 +106,9 @@ class dimReduction(imageProcess):
         data = svd.fit_transform(image)
         Sigma = np.diag(svd.singular_values_)
         path = self.modelpath
+        print(path)
         
-        with open(path + os.sep  + model +'.joblib', 'wb') as f1:
+        with open(path + model +'.joblib', 'wb') as f1:
             joblib.dump(svd, f1)
         return data, np.dot(data,np.linalg.inv(Sigma)) , svd.components_
 
