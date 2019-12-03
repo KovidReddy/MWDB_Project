@@ -68,7 +68,7 @@ class dimReduction(imageProcess):
         H = model.components_
         path = self.modelpath
 
-        with open(path + os.sep  + model_technique +'.joblib', 'wb') as f1:
+        with open(path + model_technique + '_' + str(k) + '.joblib', 'wb') as f1:
             joblib.dump(model, f1)
 
         return W, H
@@ -81,7 +81,7 @@ class dimReduction(imageProcess):
         W = model.fit_transform(imageset)
         H = model.components_
         path = self.modelpath
-        with open(path + os.sep  + model_technique +'.joblib', 'wb') as f1:
+        with open(path + model_technique + '_' + str(k) + '.joblib', 'wb') as f1:
             joblib.dump(model, f1)
 
         return W, H
@@ -95,7 +95,7 @@ class dimReduction(imageProcess):
         path = self.modelpath
         
 
-        with open(path + os.sep  + model +'.joblib', 'wb') as f1:
+        with open(path +  model + '_' + str(k) + '.joblib', 'wb') as f1:
             joblib.dump(pca, f1)
 
         return data, np.dot(data,np.linalg.inv(Sigma)), pca.components_
@@ -108,7 +108,7 @@ class dimReduction(imageProcess):
         path = self.modelpath
         print(path)
         
-        with open(path + model +'.joblib', 'wb') as f1:
+        with open(path + model + '_' + str(k) + '.joblib', 'wb') as f1:
             joblib.dump(svd, f1)
         return data, np.dot(data,np.linalg.inv(Sigma)) , svd.components_
 
@@ -425,7 +425,8 @@ class dimReduction(imageProcess):
     # Function to save the reduced dimensions to database
 
     def saveDim(self, feature, model, dbase, k, label=None, meta=False):
-
+        
+        no_clusters = 400
         imageDB = imageProcess(self.dirpath)
         imgs = imageDB.dbProcess(process='f', model=feature, dbase=dbase)
         kmeans_model = 'kmeans_' + str(no_clusters) + '_' + feature

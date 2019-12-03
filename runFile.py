@@ -1,6 +1,6 @@
 import imageProcess
 import numpy as np
-ip = imageProcess.imageProcess('C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Dataset\\')
+ip = imageProcess.imageProcess()
 arg = input("Which task would you like to run (1/2/3)? ")
 if arg == '1':
     for x in ['s', 'l', 'h', 'm']:

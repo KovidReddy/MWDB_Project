@@ -10,12 +10,15 @@ from SVM import SVM
 from DecisionTree import DecisionTree
 import joblib
 import matplotlib.pyplot as plt
+from matplotlib.image import imread
 from LSH import LSH
 import tqdm
 import math
+from PIL import Image
+import time
 
 class classify(dimReduction):
-    def __init__(self, feature='l', dim='pca', k=20):
+    def __init__(self, feature='l', dim='pca', k=30):
         super().__init__(ext='*.jpg')
         db = PostgresDB()
         self.conn = db.connect()
@@ -59,6 +62,7 @@ class classify(dimReduction):
 
     # Fetch data for a single aspect
     def fetchAspect(self, aspect):
+        no_clusters = 400
         cur = self.conn.cursor()
         cur.execute("SELECT imageid, imagedata FROM {0} t1 INNER JOIN img_meta t2 "
                     "ON t1.imageid = t2.image_id AND t2.aspect = '{1}'".format(self.table_f, aspect))
@@ -67,16 +71,46 @@ class classify(dimReduction):
         ids = []
         data = []
         for img in imgs:
-            if self.feature == 'm':
+            if self.feature == 's' or (self.feature == "m" and self.dim in ("nmf", "lda")):
+                data.extend(eval(img[1]))
+            elif self.feature == "m":
                 data.append(np.asarray(eval(img[1])).reshape((-1)))
             else:
                 data.append(np.asarray(eval(img[1])))
             ids.append(img[0])
             # data.append(eval(img[1]))
+
+        if self.feature == "s" or (self.feature == "m" and self.dim in ("nmf", "lda")):
+            try:
+                # print(self.modelpath + 'kmeans_' + str(no_clusters) + '_' + self.feature + '.joblib')
+                kmeans = joblib.load(self.modelpath + 'kmeans_' + str(no_clusters) + '_' + self.feature + '.joblib')
+                histo_list = []
+                print("aaaaaaaaaaa")
+                for des in imgs:
+                    kp = np.asarray(eval(des[1]))
+                    histo = np.zeros(no_clusters)
+                    nkp = kp.shape[0]
+                    for d in kp:
+                        idx = kmeans.predict([d])
+                        histo[idx] += 1/nkp
+                    histo_list.append(histo)
+                data = np.asarray(histo_list)
+                # print(data.shape)
+            except:
+                print("bbbbbbbbbbbbb")
+
+                Kmeans = KMeans_SIFT(no_clusters)
+                clusters = Kmeans.kmeans_process(data)
+                imgs_zip = [(img[0],np.asarray(eval(img[1]))) for img in imgs]
+                data = Kmeans.newMatrixSift(imgs_zip, clusters ,'kmeans_' + str(no_clusters) + "_" + self.feature)
+                # print(np.asarray(data).shape)
+
+
         return ids, np.asarray(data)
 
     # Fetch Test data and insert into database
     def fetchTestData(self):
+        no_clusters = 400
         db = 'imagedata_test_' + self.feature
         cur = self.conn.cursor()
         # Check if table already exists
@@ -114,22 +148,49 @@ class classify(dimReduction):
                         "AS WITH t(imageid, imagedata) AS (VALUES {1}) SELECT * FROM t".format(db, values_zip))
 
         # Read data from Table
-        cur.execute("SELECT imageid, imagedata, aspect FROM {db}, {meta} WHERE {db}.imageid = {meta}.image_id".format(db="imagedata_test_" + self.feature , meta ="img_meta"))
+        cur.execute("SELECT imageid, imagedata, aspect FROM {db}, {meta} WHERE {db}.imageid = {meta}.image_id".format(db=db , meta ="img_meta"))
         data = cur.fetchall()
         test_data = []
         test_ids = []
         test_label = []
         for rec in data:
-            if self.feature == 'm':
+            if self.feature == "s" or (self.feature == "m" and self.dim in ("nmf", "lda")):
+                test_data.extend(eval(rec[1]))
+            elif self.feature == 'm':
                 test_data.append(np.asarray(eval(rec[1])).reshape((-1)))
             else:
                 test_data.append(np.asarray(eval(rec[1])))
-            # data_test.append(np.asarray(eval(rec[1])).reshape((-1)))
             test_ids.append(rec[0])
             test_label.append(rec[2])
 
         # imgs_test = np.append(np.asarray(test_data), np.asarray(test_label).reshape((-1,1)), axis=1)
         # imgs_test = np.append(np.asarray(test_ids).reshape((-1,1)), np.asarray(imgs_test), axis=1)
+        
+        if self.feature == "s" or (self.feature == "m" and self.dim in ("nmf", "lda")):
+            try:
+                # print(self.modelpath + 'kmeans_' + str(no_clusters) +  '_' + self.feature + '.joblib')
+                kmeans = joblib.load(self.modelpath + 'kmeans_' + str(no_clusters) + '_' + self.feature + '.joblib')
+                histo_list = []
+                # print("aaaaaaaaaaa")
+                for des in data:
+                    kp = np.asarray(eval(des[1]))
+                    histo = np.zeros(no_clusters)
+                    nkp = kp.shape[0]
+                    for d in kp:
+                        idx = kmeans.predict([d])
+                        histo[idx] += 1/nkp
+                    histo_list.append(histo)
+                test_data = np.asarray(histo_list)
+                # print(test_data .shape)
+            except:
+                # print("bbbbbbbbbbbbb")
+
+                Kmeans = KMeans_SIFT(no_clusters)
+                clusters = Kmeans.kmeans_process(test_data)
+                imgs_zip = [(img[0],np.asarray(eval(img[1]))) for img in data]
+                test_data = Kmeans.newMatrixSift(imgs_zip, clusters ,'kmeans_' + str(no_clusters) + "_" + self.feature)
+                print(np.asarray(data).shape)
+
 
         self.conn.commit()
         cur.close()
@@ -181,15 +242,15 @@ class classify(dimReduction):
                 pred = 'palmar'
             if label_dict[test_ids[idx]] == pred:
                 cnt = cnt + 1
-            print(test_ids[idx])
-            print(label_dict[test_ids[idx]])
-            print('dorsal: ', dorsalValue)
-            print('palmar: ', palmarValue)
+            # print(test_ids[idx])
+            # print(label_dict[test_ids[idx]])
+            # print('dorsal: ', dorsalValue)
+            # print('palmar: ', palmarValue)
 
-        print('\nAccuracy: ', cnt/len(test_data))
+        print('\nAccuracy - {0} - {1}: {2}'.format(self.feature, self.dim,cnt/len(test_data)))
 
     # Task 2 function to use clustering to classify dorsal palmar
-    def clusterClassify(self, k=9):
+    def clusterClassify(self, k=5):
         # Check if tables exist otherwise create them
         self.checkCreate()
         # Now segregate the content between dorsal and palmar
@@ -200,7 +261,11 @@ class classify(dimReduction):
         kmeans = KMeans(k=k)
         dorsal_centroids, dorsal_clusters = kmeans.fit(dorsal_data)
         palmar_centroids, palmar_clusters = kmeans.fit(palmar_data)
-
+        print(dorsal_centroids, dorsal_clusters, dorsal_ids)
+        print(palmar_centroids, palmar_clusters, palmar_ids)
+        self.visualize(dorsal_clusters, dorsal_ids, "Dorsal", k)
+        self.visualize(palmar_clusters, palmar_ids, "Palmar", k)
+        exit(1)
         # K Nearest Neighbours on the Cluster Centroids
         dorsal_centroids = [(x, 'dorsal') for x in dorsal_centroids]
         palmar_centroids = [(x, 'palmar') for x in palmar_centroids]
@@ -230,14 +295,16 @@ class classify(dimReduction):
                 pred_label = 'palmar'
             else:
                 pred_label = 'dorsal'
-            print(pred_label, labels[idx][1])
+            # print(pred_label, labels[idx][1])
             if pred_label == labels[idx][1]:
                 cnt = cnt + 1
 
-        print('Accuracy: ', cnt/len(test_data))
+        print('Accuracy - {0}: {1}'.format(self.feature,cnt/len(test_data)))
+
+        # print('Accuracy: ', cnt/len(test_data))
 
     # Function to use SVM to classify images as palmar and dorsal
-    def svmClassify(self, constrain, svm_trained, test_trained):
+    def svmClassify(self, constrain = None):
         print(constrain)
         # Check if tables exist otherwise create them
         self.checkCreate()
@@ -254,70 +321,28 @@ class classify(dimReduction):
         y1_test = [1.0 for _ in range(len(dorsal_data))]
         y2_test = [-1.0 for _ in range(len(palmar_data))]
         svm_labels = np.hstack((y1_test, y2_test))
-        if len(svm_trained) == 0:
-            if self.feature == "s":
-                imgs_data = []
-                print(dorsal_data[0].shape)
-                print(np.asarray(palmar_data).shape)
-                for data in svm_data:
-                    imgs_data.extend(data)
-                svm_data = np.asarray(imgs_data)
-                print(imgs_data[0].shape)
-
-                try:
-                    print(self.modelpath + 'kmeans_' + str(no_clusters) + '_s.joblib')
-                    kmeans = joblib.load(self.modelpath + 'kmeans_' + str(no_clusters) + '_s.joblib')
-                    histo_list = []
-                    print("aaaaaaaaaaa")
-                    for des in svm_data:
-                        kp = np.asarray(des)
-                        histo = np.zeros(no_clusters)
-                        nkp = kp.shape[0]
-                        for d in kp:
-                            idx = kmeans.predict([d])
-                            histo[idx] += 1/nkp
-                        histo_list.append(histo)
-                    svm_data = np.asarray(histo_list)
-                    print(svm_data.shape)
-                except:
-                    print("bbbbbbbbbbbbb")
-                    imgs_data = []
-                    for data in svm_data:
-                        imgs_data.extend(data)
-                    print(np.asarray(imgs_data).shape)
-                    imgs_data = np.asarray(imgs_data)
-
-                    Kmeans = KMeans_SIFT(no_clusters)
-                    clusters = Kmeans.kmeans_process(imgs_data)
-                    imgs_zip = list(zip(svm_labels, svm_data))
-                    svm_data = Kmeans.newMatrixSift(imgs_zip, clusters ,'kmeans_' + str(no_clusters) + "_s")
-                    print(np.asarray(svm_data).shape)
-                # print(np.asarray(svm_data).shape)
-                # imgs_zip = list(zip(imgs_meta, imgs_data))
-        else:
-            svm_data = svm_trained
 
         # Perform SVM
-        svm = SVM(kernel=sv.gaussian_kernel,C=constrain)
+        svm = SVM(kernel=sv.linear_kernel)
         svm.fit(svm_data, svm_labels)
         # Fetch the test data set and transform them into feature space
         test_data, test_ids, test_label = self.fetchTestData()
-        if len(test_trained) == 0:
-            if self.feature == 's':
-                kmeans = joblib.load(self.modelpath + 'kmeans_' + str(no_clusters) + '_s.joblib')
-                print("aaaaaaaa")
-                histo_list = []
-                for des in test_data:
-                    kp = np.asarray(des)
-                    histo = np.zeros(no_clusters)
-                    nkp = kp.shape[0]
-                    for d in kp:
-                            idx = kmeans.predict([d])
-                            histo[idx] += 1/nkp
-                    histo_list.append(histo)
-                test_data = histo_list
-        else:
-            test_data = test_trained
+        # if len(test_trained) == 0:
+        # if self.feature == 's':
+        #     kmeans = joblib.load(self.modelpath + 'kmeans_' + str(no_clusters) + '_s.joblib')
+        #     print("aaaaaaaa")
+        #     histo_list = []
+        #     for des in test_data:
+        #         kp = np.asarray(des)
+        #         histo = np.zeros(no_clusters)
+        #         nkp = kp.shape[0]
+        #         for d in kp:
+        #                 idx = kmeans.predict([d])
+        #                 histo[idx] += 1/nkp
+        #         histo_list.append(histo)
+        #     test_data = histo_list
+        # else:
+        #     test_data = test_trained
         # Fetch the labels for the images
         # cur = self.conn.cursor()
         # test_ids_st = str(set(test_ids)).replace('{', '(')
@@ -331,10 +356,12 @@ class classify(dimReduction):
         y_pred = svm.predict(test_data)
         correct = np.sum(y_pred == labels)
         print(correct/len(test_data))
+        y_pred = np.array(['palmar' if x == -1.0 else "dorsal" for x in y_pred])
+        self.visualize(y_pred, test_ids, "task_4_svm_" + self.feature)
         return correct/len(test_data), svm_data, test_data
         # print(count/len(test_data))
     
-    def decisionTreeClassify(self, depth):
+    def decisionTreeClassify(self, depth = 10):
         # fetch image dataset
         # label = label.replace(" ", "_")
         # db_feature = 'imagedata_' + feature + '_' + dim
@@ -342,7 +369,7 @@ class classify(dimReduction):
         # return
         cur = self.conn.cursor()
         print(self.table_f, depth)
-        no_clusters = 300
+        no_clusters = 400
         
         # sqlm = "SELECT image_id FROM img_meta WHERE subjectid = '{s}'".format(s=subject)
         # image = self.singleImageFetch(img=img, feature=feature)
@@ -355,109 +382,53 @@ class classify(dimReduction):
             tree = model[0]
             my_tree = model[1]
         except (OSError, IOError) as e:
-            sqlj = "SELECT imageid, imagedata, aspect FROM {db}, {meta} WHERE {db}.imageid = {meta}.image_id".format(db=self.table_f, meta ="img_meta")
-            cur.execute(sqlj)
-            label_data = cur.fetchall()
-            recs_flt = []
-            img_meta = []
-            label = []
-            original = []
-            # print(label_data)
-            for rec in label_data:
-                # print(np.asarray(eval(rec[1])).shape)
-                if self.feature == 's':
-                    recs_flt.extend(eval(rec[1]))
-                    original.append(eval(rec[1]))
-                elif self.feature == 'm':
-                    recs_flt.append(np.asarray(eval(rec[1])).reshape((-1)))
-                else:
-                    recs_flt.append(eval(rec[1]))
-                img_meta.append(rec[0])
-                label.append(rec[2])
+            # Now segregate the content between dorsal and palmar
+            dorsal_ids, dorsal_data = self.fetchAspect('dorsal')
+            palmar_ids, palmar_data = self.fetchAspect('palmar')
+
+
+            tree_data = np.vstack((np.array(dorsal_data), np.array(palmar_data)))
+            y1_test = ["dorsal" for _ in range(len(dorsal_data))]
+            y2_test = ["palmar" for _ in range(len(palmar_data))]
+            tree_labels = np.hstack((y1_test, y2_test))
+            # print(tree_data.shape)
+            # print(tree_labels.shape)
         
-        if self.feature == 's':
-            try:
-                kmeans = joblib.load(self.modelpath + 'kmeans_s.joblib')
-                histo_list = []
-                for des in original:
-                    kp = np.asarray(des)
-                    histo = np.zeros(no_clusters)
-                    nkp = kp.shape[0]
-                    for d in kp:
-                        idx = kmeans.predict([d])
-                        histo[idx] += 1/nkp
-                    histo_list.append(histo)
-                recs_flt = histo_list
-                print(np.asarray(recs_flt).shape)
-            except:           
-                Kmeans = KMeans_SIFT(no_clusters)
-                clusters = Kmeans.kmeans_process(recs_flt)
-                imgs_zip = list(zip(img_meta, original))
-                recs_flt = Kmeans.newMatrixSift(imgs_zip, clusters ,'kmeans_' + str(no_clusters) + "_s")
-                print(np.asarray(recs_flt).shape)
-                # imgs_zip = list(zip(imgs_meta, imgs_data))
-            # return
-            # print(np.asarray(recs_flt).shape, len(label))
-            imgs_red = np.append(np.asarray(recs_flt), np.asarray(label).reshape((-1,1)), axis=1)
-            imgs_red = np.append(np.asarray(img_meta).reshape((-1,1)), np.asarray(imgs_red), axis=1)
-            # np.random.shuffle(imgs_red)
-            # print(imgs_red)
-            # print(imgs_red)
-            # print(imgs_red[:150,1:].shape)
-            # print(imgs_red[150:].shape)
-            # print("Full:", imgs_red[:150])
-            # print("Not Full:",imgs_red[:150,1:])
-            # exit(1)
+            imgs_red = np.append(np.asarray(tree_data), np.asarray(tree_labels).reshape((-1,1)), axis=1)
+            
             if not tree:
                 tree = DecisionTree(max_depth = depth, min_support = 5)
-                my_tree = tree.build_tree(imgs_red[:,1:])
+                my_tree = tree.build_tree(imgs_red)
                 with open(self.modelpath + self.table_f + '_' + str(depth) + '.joblib', 'wb') as f1:
                     joblib.dump([tree, my_tree], f1)
 
-        # sqlj = "SELECT imageid, imagedata, aspect FROM {db}, {meta} WHERE {db}.imageid = {meta}.image_id".format(db="imagedata_test_" + self.feature , meta ="img_meta")
-        # cur.execute(sqlj)
-        # label_test = cur.fetchall()
-        # data_test = []
-        # meta_test = []
-        # label = []
+        
         data_test, meta_test, label = self.fetchTestData()
-        # print(label_data)
-        # for rec in label_test:
-        #     if self.feature == 'm':
-        #         data_test.append(np.asarray(eval(rec[1])).reshape((-1)))
-        #     else:
-        #         data_test.append(eval(rec[1]))
-        #     # data_test.append(np.asarray(eval(rec[1])).reshape((-1)))
-        #     meta_test.append(rec[0])
-        #     label.append(rec[2])
-        if self.feature == 's':
-            kmeans = joblib.load(self.modelpath + 'kmeans_s.joblib')
-            print("aaaaaaaa")
-            histo_list = []
-            for des in data_test:
-                kp = np.asarray(des)
-                histo = np.zeros(no_clusters)
-                nkp = kp.shape[0]
-                for d in kp:
-                    idx = kmeans.predict([d])
-                    histo[idx] += 1/nkp
-                histo_list.append(histo)
-            data_test = histo_list
+        
         print(np.asarray(data_test).shape)
         imgs_test = np.append(np.asarray(data_test), np.asarray(label).reshape((-1,1)), axis=1)
         imgs_test = np.append(np.asarray(meta_test).reshape((-1,1)), np.asarray(imgs_test), axis=1)
 
         count = 0
+        prediction_label = []
         for row in imgs_test:
             # print(row)
             result = tree.print_leaf(tree.classify(row[1:], my_tree))
             d = eval(str(result))
+            # print(d.keys())
             # print(d)
             if row[-1] in d and int(d[row[-1]][:-1]) > 50:
                 count += 1
+                prediction_label.append(row[-1])
+            else:
+                if row[-1] == "palmar":
+                    prediction_label.append("dorsal")
+                else:
+                    prediction_label.append("palmar")
             # print ("Image: %s. Actual: %s. Predicted: %s" %
             #         (row[0], row[-1], result))
         print("Result:", float(count / len(imgs_test)))
+        self.visualize(prediction_label, imgs_test[:,0], "task_4_tree_" + self.feature)
         return float(count / len(imgs_test))
 
    # Method to use LSH to classify
@@ -586,19 +557,101 @@ class classify(dimReduction):
         self.conn.commit()
         cur.close()
         return img_dict
+
+    def visualize(self, clusters, image_id, title, k = None):
+        # print(self.dirpath)
+
+        cluster_dic = {}
+    
+        for i in clusters:
+            if i not in cluster_dic:
+                cluster_dic[i] = []
+        # print(cluster_dic)
+
+        for i in range(len(clusters)):
+            cluster_dic[clusters[i]] += [image_id[i]]
+        # fig = plt.figure()
+        # print(cluster_dic)
+        number_of_files = len(image_id)
+        openFile = open(self.outpath + title.lower() + ".html", "w")
+        openFile.write("""<!DOCTYPE html><html><head><style>* {box-sizing: border-box;}.column {
+                        float: left;
+                        width: 10%;
+                        padding: 5px;
+                        }
+
+                        /* Clearfix (clear floats) */
+                        .row::after {
+                        content: "";
+                        clear: both;
+                        display: table;
+                        }
+                        </style>
+                        </head>
+                        <body>""")
+        openFile.write("<h3>The resulting image of " + title +":</h3>")
+        for key, value in sorted(cluster_dic.items()):
+            # print(key, value)
+            number_of_files = len(value)
+            # print(number_of_files // 10)
+            if key == "palmar" or key == "dorsal":
+                openFile.write("<h5>" + key.title() + " Images Prediction </h5>")
+            else:
+                openFile.write("<h5>Cluster " + str(key)+ '</h5>')
+            for i in range((number_of_files // 10) + 1):
+                openFile.write("""<div class="row">""")
+                if (number_of_files - i*10) >= 10:
+                    col = 10
+                else:
+                    col = (number_of_files - i*10)
+                for j in range(col):
+                    openFile.write("""<div class="column">""")
+                    openFile.write(value[i * 10 + j])
+                    if k:
+                        openFile.write('<img src="' + self.dirpath + value[i * 10 + j] + self.ext[1:] + '" style="width:100%">')
+                    else:
+                        openFile.write('<img src="' + self.testpath + value[i * 10 + j] + self.ext[1:] + '" style="width:100%">')
+                        
+                    openFile.write('</div>')
+                    # print(value[i * 10 + j])
+                    # with Image.open(self.dirpath + value[i * 10 + j] + self.ext[1:]) as test_image:
+                    #     test_image.resize((600,600), Image.ANTIALIAS).show()
+                    #     feature = input('Relevant(R) or Irrelevant(I):')
+                    #     time.sleep(10)
+                    # img = Image.open(self.dirpath + value[i * 10 + j] + self.ext[1:])
+                    # img = img.resize((600,600), Image.ANTIALIAS)
+                    # img.show(title = value[i * 10 + j])
+                    # feature = input('Relevant(R) or Irrelevant(I):')
+                    # for proc in psutil.process_iter():
+                    #     if proc.name() == "display":
+                    #         proc.kill()
+
+                    # a=fig.add_subplot(1,5,i+1)
+                    # image = imread(self.dirpath + image_id[i] + self.ext[1:])
+                    # a.imshow(image,cmap='Greys_r')
+                    # a.axis('off')
+                    # a.set_title("abc")
+                openFile.write('</div>')
+            # plt.show()
+        openFile.close()
+
 feature = input('Please choose a feature model - SIFT(s), Moments(m), LBP(l), Histogram(h): ')
 if feature not in ('s', 'm', 'l', 'h'):
     print('Please enter a valid feature model!')
     exit()
 technique = input('Please choose a dimensionality reduction technique - PCA(pca), SVD(svd), NMF(nmf), LDA(lda): ')
 
-c = classify(feature = feature, dim= technique)
-# c.relevanceFeedback()
-# c.clusterClassify()
+# for f in ["l", "h", "m", "s"]:
+#     # for t in ["svd", "pca", "lda" , "nmf"]:
+#     c = classify(feature = f)
+# # c.relevanceFeedback()
+#     c.clusterClassify()
 
-c.LSAnalysis()
+        # c.LSAnalysis()
+c = classify(feature = feature)
+c.decisionTreeClassify()
 exit(1)
-# c.svmClassify()
+# # c.svmClassify()
 
 obj_list = []
 x_axis = []

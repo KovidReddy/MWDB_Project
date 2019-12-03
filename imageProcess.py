@@ -138,6 +138,7 @@ class imageProcess:
         filecnt = len(glob.glob(self.dirpath + self.ext))
         pbar = tqdm.tqdm(total=filecnt)
         # Read images from the directory
+        print(self.dirpath + self.ext)
         for filename in glob.glob(self.dirpath + self.ext):
             if model == 'm':
                 pixels, size = self.fetchImagesAsPix(filename)
