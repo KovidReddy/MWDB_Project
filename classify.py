@@ -285,6 +285,7 @@ class classify(dimReduction):
         else:
             print('11K imagedata already loaded into the Database')
             # Read data from Table
+        print('Fetching the 11k images from the Database...')
         cur.execute("SELECT * FROM imagedata_11K_{0}".format(self.feature))
         data = cur.fetchall()
         img_dict = {}
@@ -303,7 +304,7 @@ class classify(dimReduction):
         neighbors = lsh.NNSearch(list(img_dict.keys()), index, label)
 
         # Perform Naive KNN
-        distances = sorted([(n,self.simMetric(np.array(img_dict[label]), np.array(img_dict[n]))) for n in neighbors], key=lambda x:x[0])[0:n]
+        distances = sorted([(n,self.simMetric(np.array(img_dict[label]), np.array(img_dict[n]))) for n in neighbors], key=lambda x:x[1])[0:n]
         nearest = [x[0] for x in distances]
         print('The Nearest Images to {0} are : '.format(label), nearest)
         self.display_images(nearest, 'LSH_result.png')
@@ -398,6 +399,3 @@ class classify(dimReduction):
             new_nearest = [x[0] for x in scores[0:n]]
             print('The New Nearest Images to {0} are : '.format(label), new_nearest)
             self.display_images(new_nearest, 'feedback.png')
-
-c = classify()
-c.relevanceFeedback()
