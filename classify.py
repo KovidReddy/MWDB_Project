@@ -9,6 +9,8 @@ from SVM import SVM
 from LSH import LSH
 import tqdm
 import math
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 class classify(dimReduction):
     def __init__(self, feature='l', dim='svd', k=20):
         super().__init__(ext='*.jpg')
@@ -159,6 +161,7 @@ class classify(dimReduction):
         # K Nearest Neighbours on the Cluster Centroids
         dorsal_centroids = [(x, 'dorsal') for x in dorsal_centroids]
         palmar_centroids = [(x, 'palmar') for x in palmar_centroids]
+
         centroids = dorsal_centroids + palmar_centroids
 
         # Fetch the test data set and transform them into feature space
@@ -221,6 +224,28 @@ class classify(dimReduction):
         correct = np.sum(y_pred == labels)
         print(correct/len(test_data))
 
+    def display_images(self, images, title):
+        no_images = len(images)
+        columns = 4
+        rows = no_images // columns
+        if no_images % columns != 0:
+            rows += 1
+        fig = plt.figure(figsize=(30, 20))
+        ax = []
+        fig.canvas.set_window_title('LSH NN Search')
+        for i in range(no_images):
+            img = mpimg.imread(self.ogpath + self.ext.replace('*', images[i]))
+            # create subplot and append to ax
+            ax.append(fig.add_subplot(rows, columns, i+1))
+            if i == 0:
+                    ax[-1].set_title("Given Image: " + images[i])  # set title
+            else:
+                    ax[-1].set_title("Image "+str(i) + ": " + images[i])  # set title
+            ax[-1].axis('off')
+            plt.imshow(img)
+        plt.savefig(self.outpath + title)
+        plt.show()
+
     # Fetch 11K images
     def fetch11KImages(self):
         # Check if table exists for 11 K images
@@ -281,7 +306,7 @@ class classify(dimReduction):
         distances = sorted([(n,self.simMetric(np.array(img_dict[label]), np.array(img_dict[n]))) for n in neighbors], key=lambda x:x[0])[0:n]
         nearest = [x[0] for x in distances]
         print('The Nearest Images to {0} are : '.format(label), nearest)
-        lsh.display_images(nearest)
+        self.display_images(nearest, 'LSH_result.png')
 
         return [(x,img_dict[x]) for x in nearest], [(x,img_dict[x]) for x in neighbors]
 
@@ -293,9 +318,21 @@ class classify(dimReduction):
             threshold = np.mean(d[1])
             bin_data.append([1 if x > threshold else 0 for x in d[1]])
             labels.append(d[0])
-        bin_data = list(zip(labels,bin_data))
-        relevant_vals = np.array([x[1] for x in relevant])
-        irrelevant_vals = np.array([x[1] for x in irrelevant])
+        bin_data = list(zip(labels, bin_data))
+        bin_data_r = []
+        labels_r = []
+        for d in relevant:
+            threshold = np.mean(d[1])
+            bin_data_r.append([1 if x > threshold else 0 for x in d[1]])
+            labels_r.append(d[0])
+        bin_data_i = []
+        labels_i = []
+        for d in irrelevant:
+            threshold = np.mean(d[1])
+            bin_data_i.append([1 if x > threshold else 0 for x in d[1]])
+            labels_i.append(d[0])
+        relevant_vals = np.array(bin_data_r)
+        irrelevant_vals = np.array(bin_data_i)
         # Now calculate the parameters for probability calculation
         r = relevant_vals.sum(axis=0)
         ir = irrelevant_vals.sum(axis=0)
@@ -305,48 +342,62 @@ class classify(dimReduction):
         scores = []
         print('Calculating Probability Scores...')
         for lab, n in bin_data:
-            prob_score = np.sum([x * math.log((r[i]/(R - r[i])) + 0.5 / ((ir[i]/(IR - ir[i])) + 0.5)) for i, x in enumerate(n)])
+            prob_score = np.sum([x * math.log((((r[i] + 0.5) /(R - r[i] + 1)) ) / ((ir[i] + 0.5)/(IR - ir[i] + 1))) for i, x in enumerate(n)])
             scores.append((lab, prob_score))
         # Sort the images by their probability scores
         scores = sorted(scores, key=lambda x: x[1], reverse=True)
         return scores
 
     # Method to perform Relevance Feedback based ranking
-    def relevanceFeedback(self, n=10, label='Hand_0000002', k=5, l=3):
+    def relevanceFeedback(self, n=20, label='Hand_0000002', k=5, l=3):
         # Perform Task 5 to get outputs
         nearest, neighbors = self.lshClassify(n=n, label=label, k=k, l=l)
 
         # Input of each image as Relevant or Irrelevant
         print('Please provide feedback for each of the nearest Images (Relevant - R/ Irrelevant - I): ')
+        print('Control Options: Skip image - S / Exit Feedback - E')
         feedback = []
         for x,y in nearest:
             ir = input('{0}: '.format(x))
             if ir == 'R':
                 feedback.append(1)
-            else:
+            elif ir == 'I':
                 feedback.append(-1)
-        algo = input('Please choose the algorithm for the feedback mechanism: (SVM -svm, Decision Tree -dt, PPR -ppr, Probability -prob)')
+            elif ir == 'S':
+                feedback.append(0)
+            elif ir == 'E':
+                break
+
+        algo = input('Please choose the algorithm for the feedback mechanism: '
+                     '(SVM -svm, Decision Tree -dt, PPR -ppr, Probability -prob)')
 
         if algo == 'svm':
             svm = SVM(C=1000.1)
-            svm_data = np.array([x[1] for x in nearest])
-            svm_labels = np.array(feedback)
+            rel_data = [nearest[i][1] for i,x in enumerate(feedback) if x == 1]
+            irel_data = [nearest[i][1] for i,x in enumerate(feedback) if x == -1]
+            rel_labels = np.array([1.0 for x in feedback if x == 1])
+            irel_labels = np.array([-1.0 for x in feedback if x == -1])
+            svm_labels = np.hstack((rel_labels, irel_labels))
+            svm_data = np.vstack((np.array(rel_data), np.array(irel_data)))
             svm.fit(svm_data, svm_labels)
             y_pred = svm.predict([x[1] for x in neighbors])
             indices = [i for i, x in enumerate(y_pred) if x == 1]
             new_neighbors = [neighbors[i] for i in indices]
-            distances = sorted([(n, self.simMetric(np.array(label), np.array(n))) for label, n in new_neighbors], key=lambda x: x[0])[0:n]
+            src_image = [x[1] for x in nearest if x[0] == label]
+            distances = sorted([(l, self.simMetric(np.array(src_image[0]), np.array(n))) for l, n in new_neighbors], key=lambda x: x[1], reverse=True)[0:n]
             new_nearest = [x[0] for x in distances]
             print('The New Nearest Images to {0} are : '.format(label), new_nearest)
+            self.display_images(new_nearest, 'feedback.png')
 
         elif algo == 'prob':
             rel_indices = [i for i, x in enumerate(feedback) if x == 1]
             relevant = [nearest[i] for i in rel_indices]
-            irel_indices = [i for i, x in enumerate(feedback) if x == 1]
+            irel_indices = [i for i, x in enumerate(feedback) if x == -1]
             irrelevant = [nearest[i] for i in irel_indices]
             scores = self.probRelFeedback(relevant, irrelevant, neighbors)
             new_nearest = [x[0] for x in scores[0:n]]
             print('The New Nearest Images to {0} are : '.format(label), new_nearest)
+            self.display_images(new_nearest, 'feedback.png')
 
 c = classify()
 c.relevanceFeedback()
