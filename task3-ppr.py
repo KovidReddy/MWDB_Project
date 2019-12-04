@@ -20,11 +20,11 @@ def similarity(res, id, k):
     s = sorted(s.items(), key = lambda x : x[1], reverse=True)
     return s[0:k+1]
 
-k = 4 #int(input("Enter k (Number of edges from each vertex):"))
-K = 10 #int(input("Enter K (Number of images to be returned after personalization): "))
-id1 = "Hand_0008333"#input("Enter first id: ")
-id2 = "Hand_0006183"#input("Enter Second id: ")
-id3 = "Hand_0000074"#input("Enter third id: ")
+k = int(input("Enter k (Number of edges from each vertex):"))
+K = int(input("Enter K (Number of images to be returned after personalization): "))
+id1 = input("Enter first id: (Hand_0008333)")
+id2 = input("Enter Second id: (Hand_0006183)")
+id3 = input("Enter third id: (Hand_0000074)")
 ids = [id1, id2, id3]
 personalization = {}
 for i in res:

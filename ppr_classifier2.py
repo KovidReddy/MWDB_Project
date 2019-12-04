@@ -16,7 +16,7 @@ imgP = imageProcess()
 res = c.fetchData(table_name="ppr_imagedata_h")
 
 threshold = 6
-folder = "C:\\Users\\nemad\\Downloads\\MWDB\\project\\phase3_sample_data\\phase3_sample_data\\Unlabelled\\Set_2\\"#input("Enter test folder path:")
+folder = input("Enter test folder path: (C:\\Users\\nemad\\Downloads\\MWDB\\project\\phase3_sample_data\\phase3_sample_data\\Unlabelled\\Set_2\\)")
 def similarity(res, id):
     s = {}
     temp = res[id]
@@ -25,7 +25,6 @@ def similarity(res, id):
         s[i] = dist
     s = sorted(s.items(), key = lambda x : x[1])
     return s
-#meta_data = imgP.readMetaData(meta_file="C:\\Users\\nemad\\Downloads\\MWDB\\project\\phase3_sample_data\\phase3_sample_data\\labelled_set2.csv")
 meta_data_verify = imgP.readMetaData()
 meta_file="C:\\Users\\nemad\\Downloads\\MWDB\\project\\phase3_sample_data\\phase3_sample_data\\labelled_set2.csv"
 with open(meta_file, 'r') as file:
