@@ -1,8 +1,8 @@
 {
-  "dataset":"C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Dataset\\",
-  "model": "C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Models\\",
-  "meta": "C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Dataset\\HandInfo.csv",
-  "outputs": "C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Outputs",
-  "ogpath": "C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Hands\\",
-  "test": "C:\\Users\\pylak\\Documents\\Fall 2019\\MWDB\\Project\\Phase1\\Hands_test2\\"
+  "dataset":"C:\\Users\\nemad\\Downloads\\MWDB\\project\\phase3_sample_data\\phase3_sample_data\\Labelled\\Set2\\",
+  "model": "C:\\Users\\nemad\\PycharmProjects\\new1\\venv\\Models\\",
+  "meta": "C:\\Users\\nemad\\PycharmProjects\\new1\\venv\\Hands\\HandInfo.csv",
+  "outputs": "C:\\Users\\nemad\\PycharmProjects\\new1\\venv\\Outputs\\",
+  "ogpath": "C:\\Users\\nemad\\PycharmProjects\\new1\\venv\\etc\\hands_temp\\",
+  "test": "C:\\Users\\nemad\\PycharmProjects\\new1\\venv\\etc\\hands_temp\\"
 }

@@ -126,7 +126,7 @@ class LSH(imageProcess):
                     ax[-1].set_title("Image "+str(i) + ": " + images[i])  # set title
             ax[-1].axis('off')
             plt.imshow(img)
-        plt.savefig('../Phase1/Outputs/LSH_result.png')
+        plt.savefig('../Outputs/LSH_result.png')
         plt.show()
 
     def NNSearch(self, labels, index_structure, imageid):

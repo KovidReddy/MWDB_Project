@@ -6,4 +6,4 @@ k = input('Please enter the number of hashes (k): ')
 l = input('Please enter the number of layers (l): ')
 
 cls = classify()
-_,_ = cls.relevanceFeedback(n=int(n), label=label, k=int(k), l=int(l))
+cls.relevanceFeedback(n=int(n), label=label, k=int(k), l=int(l))
