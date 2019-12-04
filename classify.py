@@ -304,7 +304,7 @@ class classify(dimReduction):
         neighbors = lsh.NNSearch(list(img_dict.keys()), index, label)
 
         # Perform Naive KNN
-        distances = sorted([(n,self.simMetric(np.array(img_dict[label]), np.array(img_dict[n]))) for n in neighbors], key=lambda x:x[1])[0:n]
+        distances = sorted([(n,self.simMetric(np.array(img_dict[label]), np.array(img_dict[n]))) for n in neighbors], reverse=True, key=lambda x:x[1])[0:n]
         nearest = [x[0] for x in distances]
         print('The Nearest Images to {0} are : '.format(label), nearest)
         self.display_images(nearest, 'LSH_result.png')
