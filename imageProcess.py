@@ -133,7 +133,7 @@ class imageProcess:
     3. Hog: imagedata_h(imageid, data)
     4. LBP: imagedata_l(imageid, data)    
     """
-    def dbSave(self, conn, model):
+    def dbSave(self, conn, model, dbname=""):
         # Count the number of files in the directory
         filecnt = len(glob.glob(self.dirpath + self.ext))
         pbar = tqdm.tqdm(total=filecnt)
@@ -144,19 +144,23 @@ class imageProcess:
                 momments = self.imageMoments(pixels, size)
                 # Convert to string to insert into DB as an array
                 values_st = str(np.asarray(momments).tolist())
-                dbname = 'imagedata_m'
+                if not dbname:
+                    dbname = 'imagedata_m'
             elif model == 's':
                 des = self.sift_features(filename)
                 values_st = str(np.asarray(des).tolist())
-                dbname = 'imagedata_s'
+                if not dbname:
+                    dbname = 'imagedata_s'
             elif model == 'h':
                 h_val = self.hog_process(filename)
                 values_st = str(np.asarray(h_val).tolist())
-                dbname = 'imagedata_h'
+                if not dbname:
+                    dbname = 'imagedata_h'
             elif model == 'l':
                 lbp_val = self.lbp_preprocess(filename)
                 values_st = str(np.asarray(lbp_val).tolist())
-                dbname = 'imagedata_l'
+                if not dbname:
+                    dbname = 'imagedata_l'
             else:
                 print('Incorrect value for Model provided')
                 exit()
@@ -196,12 +200,12 @@ class imageProcess:
         db = PostgresDB()
         conn = db.connect()
         if process == 's':
-            self.dbSave(conn, model)
+            self.dbSave(conn, model, dbname=dbase)
             print('Data saved successfully to the Database!')
         elif process == 'f':
             recs = self.dbFetch(conn,dbase)
             recs_flt = []
-            # Flatten the data structure and 
+            # Flatten the data structure and
             for rec in recs:
                 recs_flt.append((rec[0],np.asarray(eval(rec[1]))))
             return recs_flt
@@ -376,8 +380,10 @@ class imageProcess:
         cur.close()
     
     
-    def readMetaData(self):
-        with open(self.metapath, 'r') as file:
+    def readMetaData(self, meta_file =""):
+        if meta_file == "":
+            meta_file = self.metapath
+        with open(meta_file, 'r') as file:
             csv_reader = csv.reader(file)
             meta_file = []
             for idx, row in enumerate(csv_reader):

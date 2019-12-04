@@ -11,6 +11,9 @@ import tqdm
 import math
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
+import ppr_helper
+import pandas as pd
+from collections import OrderedDict
 class classify(dimReduction):
     def __init__(self, feature='l', dim='svd', k=20):
         super().__init__(ext='*.jpg')
@@ -104,6 +107,25 @@ class classify(dimReduction):
         self.conn.commit()
         cur.close()
         return test_ids, test_data
+
+    def fetchData(self, table_name=""):
+        if not table_name:
+            table_name = self.table_f
+        self.checkCreate()
+        cur = self.conn.cursor()
+        res = {}
+        cur.execute("SELECT imageid, imagedata FROM {0}".format(table_name))
+        imgs = cur.fetchall()
+        # Separate Image IDs and Image data
+        ids = []
+        data = []
+        for img in imgs:
+            # res.append({img[0]: eval(img[1])})
+            res[img[0]] = eval(img[1])
+            # ids.append(img[0])
+            # data.append(eval(img[1]))
+        # print("returning", res,"ending")
+        return res
 
     # Task 1 Function to perform LSA
     def LSAnalysis(self):
@@ -358,10 +380,14 @@ class classify(dimReduction):
         print('Please provide feedback for each of the nearest Images (Relevant - R/ Irrelevant - I): ')
         print('Control Options: Skip image - S / Exit Feedback - E')
         feedback = []
+        p_feedback = 0
+        p_feedback_imgs = []
         for x,y in nearest:
             ir = input('{0}: '.format(x))
             if ir == 'R':
                 feedback.append(1)
+                p_feedback_imgs.append(x)
+                p_feedback += 1
             elif ir == 'I':
                 feedback.append(-1)
             elif ir == 'S':
@@ -399,3 +425,47 @@ class classify(dimReduction):
             new_nearest = [x[0] for x in scores[0:n]]
             print('The New Nearest Images to {0} are : '.format(label), new_nearest)
             self.display_images(new_nearest, 'feedback.png')
+        elif algo == 'ppr':
+            data = []
+            k = []
+            personalization = {}
+            neighbors_dict = {}
+            for i in neighbors:
+                neighbors_dict[i[0]] = i[1]
+            for i in neighbors_dict:
+                weights = ppr_helper.similarity(neighbors_dict, i)
+                temp_dict = {}
+                for w in weights:
+                    temp_dict[w[0]] = w[1]
+                data.append(temp_dict)
+                k.append(i)
+                if i in p_feedback_imgs:
+                    personalization[i] = 1/p_feedback
+                else:
+                    personalization[i] = 0
+            temp = pd.DataFrame(data, index=k)
+            pageRankScores = np.zeros(len(personalization))
+            teleportation_matrix = np.zeros(len(personalization))
+            t = 0
+            for i in personalization:
+                pageRankScores[t] = personalization[i]
+                teleportation_matrix[t] = personalization[i]
+                t += 1
+            print(len(personalization), len(pageRankScores), temp.shape)
+            pageRank = ppr_helper.ppr(temp, pageRankScores, teleportation_matrix, 0.5)
+            res1 = OrderedDict({})
+            z = 0
+            new_nearest = []
+            print(personalization)
+            res1[label] = 1
+            new_nearest.append(label)
+            for i in personalization:
+                if i != label:
+                    res1[i] = pageRank[z]
+                    new_nearest.append(i)
+                z += 1
+            res1 = sorted(res1.items(), key=lambda x: x[1], reverse=True)
+            print('The New Nearest Images to {0} are : '.format(label), res1[0:n])
+            self.display_images(new_nearest, 'feedback.png')
+# c = classify()
+# c.relevanceFeedback()
