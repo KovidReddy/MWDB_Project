@@ -1,7 +1,5 @@
 import numpy as np
 import cv2
-import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
 from imageProcess import imageProcess
 import json
 import tqdm
@@ -69,7 +67,7 @@ class LSH(imageProcess):
     # Save index structure to JSON file
     def saveIndex(self, index_structure):
         try:
-            with open(self.outpath + 'index.json', 'w') as j:
+            with open(self.outpath + 'index_{k}_{l}.json'.format(k=self.k,l=self.L), 'w') as j:
                 json.dump(index_structure, j)
             print('Saved Index structure to {0} successfully!'.format(self.outpath))
         except Exception as e:
@@ -77,11 +75,11 @@ class LSH(imageProcess):
 
     def fetchIndex(self):
         try:
-            with open(self.outpath + 'index.json', 'r') as j:
+            with open(self.outpath + 'index_{k}_{l}.json'.format(k=self.k,l=self.L), 'r') as j:
                 index = json.load(j)
             return index
         except Exception as e:
-            print('Prcessing Index Structure!')
+            print('Processing Index Structure!')
             return -1
 
 
@@ -107,27 +105,6 @@ class LSH(imageProcess):
 
         return index_structure
 
-    def display_images(self, images):
-        no_images = len(images)
-        columns = 4
-        rows = no_images // columns
-        if no_images % columns != 0:
-            rows += 1
-        fig = plt.figure(figsize=(30, 20))
-        ax = []
-        fig.canvas.set_window_title('LSH NN Search')
-        for i in range(no_images):
-            img = mpimg.imread(self.ogpath + self.ext.replace('*', images[i]))
-            # create subplot and append to ax
-            ax.append(fig.add_subplot(rows, columns, i+1))
-            if i == 0:
-                    ax[-1].set_title("Given Image: " + images[i])  # set title
-            else:
-                    ax[-1].set_title("Image "+str(i) + ": " + images[i])  # set title
-            ax[-1].axis('off')
-            plt.imshow(img)
-        plt.savefig(self.outpath + 'LSH_result.png')
-        plt.show()
 
     def NNSearch(self, labels, index_structure, imageid):
         image_set = set()
@@ -141,14 +118,6 @@ class LSH(imageProcess):
                         temp_set = temp_set.intersection(set(index_structure[hsh][str(bucket)]))
                     num_total_images = num_total_images + len(temp_set)
                 image_set = image_set.union(temp_set)
+        print('Total number of images: {t}'.format(t=num_total_images))
+        print('Unique Images compared: {u}'.format(u=len(image_set)))
         return list(image_set)
-
-
-
-
-
-
-
-# l = LSH()
-# x= l.get_random_vectors(256)
-# print(len)

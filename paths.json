@@ -2,6 +2,7 @@
   "dataset":"/home/anhnguyen/ASU/CSE-515/Project/Phase 3/phase3_sample_data/Labelled/Set2/",
   "model": "/home/anhnguyen/ASU/CSE-515/Project/Phase 3/Model/",
   "meta": "/home/anhnguyen/ASU/CSE-515/Project/Phase 3/phase3_sample_data/HandInfo.csv",
+  "metaset2": "/home/anhnguyen/ASU/CSE-515/Project/Phase 3/phase3_sample_data/labelled_set2.csv",
   "outputs": "/home/anhnguyen/ASU/CSE-515/Project/Phase 3/Outputs/",
   "ogpath": "/home/anhnguyen/ASU/CSE-515/Project/Phase 1/Hands/",
   "test": "/home/anhnguyen/ASU/CSE-515/Project/Phase 3/phase3_sample_data/Unlabelled/Set 2/"

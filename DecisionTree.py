@@ -396,13 +396,13 @@ class Decision_Node:
 
 
 
-training_data = [
-    ['Green', 3, 'Apple'],
-    ['Yellow', 3, 'Apple'],
-    ['Red', 1, 'Grape'],
-    ['Red', 1, 'Grape'],
-    ['Yellow', 3, 'Lemon'],
-]
+# training_data = [
+#     ['Green', 3, 'Apple'],
+#     ['Yellow', 3, 'Apple'],
+#     ['Red', 1, 'Grape'],
+#     ['Red', 1, 'Grape'],
+#     ['Yellow', 3, 'Lemon'],
+# ]
 
 # Column labels.
 # These are used only to print the tree.

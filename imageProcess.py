@@ -32,15 +32,16 @@ class imageProcess:
                 ogpath = js['ogpath']
                 outputs = js['outputs']
                 test = js['test']
+                metaset2 = js['metaset2']
 
         except Exception as error:
             print(error)
             exit(-1)
 
-        return dataset, model, meta, ogpath, outputs, test
+        return dataset, model, meta, metaset2, ogpath, outputs, test
 
     def __init__(self, ext='*.jpg'):
-        self.dirpath, self.modelpath, self.metapath, self.ogpath, self.outpath, self.testpath = self.paths()
+        self.dirpath, self.modelpath, self.metapath, self.metaset2, self.ogpath, self.outpath, self.testpath = self.paths()
         self.ext = ext
 
     # Method to fetch images as pixels

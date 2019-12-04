@@ -14,8 +14,9 @@ from matplotlib.image import imread
 from LSH import LSH
 import tqdm
 import math
-from PIL import Image
-import time
+import pandas as pd 
+import ppr_helper
+import csv
 
 class classify(dimReduction):
     def __init__(self, feature='l', dim='pca', k=30):
@@ -85,7 +86,7 @@ class classify(dimReduction):
                 # print(self.modelpath + 'kmeans_' + str(no_clusters) + '_' + self.feature + '.joblib')
                 kmeans = joblib.load(self.modelpath + 'kmeans_' + str(no_clusters) + '_' + self.feature + '.joblib')
                 histo_list = []
-                print("aaaaaaaaaaa")
+                # print("aaaaaaaaaaa")
                 for des in imgs:
                     kp = np.asarray(eval(des[1]))
                     histo = np.zeros(no_clusters)
@@ -97,7 +98,7 @@ class classify(dimReduction):
                 data = np.asarray(histo_list)
                 # print(data.shape)
             except:
-                print("bbbbbbbbbbbbb")
+                # print("bbbbbbbbbbbbb")
 
                 Kmeans = KMeans_SIFT(no_clusters)
                 clusters = Kmeans.kmeans_process(data)
@@ -233,6 +234,7 @@ class classify(dimReduction):
         labels = cur.fetchall()
         label_dict = {el[0]:el[1] for el in labels}
         cnt = 0
+        y_pred = []
         for idx, test in enumerate(test_data):
             dorsalValue = np.linalg.norm(np.dot(test, lsDorsal.T))
             palmarValue = np.linalg.norm(np.dot(test, lsPalmar.T))
@@ -240,12 +242,14 @@ class classify(dimReduction):
                 pred = 'dorsal'
             else:
                 pred = 'palmar'
+            y_pred.append(pred)
             if label_dict[test_ids[idx]] == pred:
                 cnt = cnt + 1
             # print(test_ids[idx])
             # print(label_dict[test_ids[idx]])
             # print('dorsal: ', dorsalValue)
             # print('palmar: ', palmarValue)
+        self.visualize(y_pred, test_ids, "task_1_" + self.feature + '_' + self.dim, label = label_dict)
 
         print('\nAccuracy - {0} - {1}: {2}'.format(self.feature, self.dim,cnt/len(test_data)))
 
@@ -261,11 +265,11 @@ class classify(dimReduction):
         kmeans = KMeans(k=k)
         dorsal_centroids, dorsal_clusters = kmeans.fit(dorsal_data)
         palmar_centroids, palmar_clusters = kmeans.fit(palmar_data)
-        print(dorsal_centroids, dorsal_clusters, dorsal_ids)
-        print(palmar_centroids, palmar_clusters, palmar_ids)
-        self.visualize(dorsal_clusters, dorsal_ids, "Dorsal", k)
-        self.visualize(palmar_clusters, palmar_ids, "Palmar", k)
-        exit(1)
+        # print(dorsal_centroids, dorsal_clusters, dorsal_ids)
+        # print(palmar_centroids, palmar_clusters, palmar_ids)
+        self.visualize(dorsal_clusters, dorsal_ids, "Dorsal " + self.feature.upper(), k)
+        self.visualize(palmar_clusters, palmar_ids, "Palmar " + self.feature.upper(), k)
+        # exit(1)
         # K Nearest Neighbours on the Cluster Centroids
         dorsal_centroids = [(x, 'dorsal') for x in dorsal_centroids]
         palmar_centroids = [(x, 'palmar') for x in palmar_centroids]
@@ -282,6 +286,7 @@ class classify(dimReduction):
         cur.execute("SELECT image_id, aspect FROM img_meta WHERE image_id IN {0}".format(test_ids_st))
         labels = cur.fetchall()
         cnt = 0
+        y_pred = []
         for idx, test in enumerate(test_data):
             cnt_d = 0
             cnt_p = 0
@@ -296,8 +301,15 @@ class classify(dimReduction):
             else:
                 pred_label = 'dorsal'
             # print(pred_label, labels[idx][1])
+            y_pred.append(pred_label)
             if pred_label == labels[idx][1]:
                 cnt = cnt + 1
+        test_ids = [x[0] for x in labels]
+        label_dict = {}
+        for x in labels:
+            label_dict[x[0]] = x[1]
+
+        self.visualize(y_pred, test_ids, "task_2_" + self.feature, label = label_dict)
 
         print('Accuracy - {0}: {1}'.format(self.feature,cnt/len(test_data)))
 
@@ -305,7 +317,7 @@ class classify(dimReduction):
 
     # Function to use SVM to classify images as palmar and dorsal
     def svmClassify(self, constrain = None):
-        print(constrain)
+        # print(constrain)
         # Check if tables exist otherwise create them
         self.checkCreate()
         no_clusters = 400
@@ -327,29 +339,7 @@ class classify(dimReduction):
         svm.fit(svm_data, svm_labels)
         # Fetch the test data set and transform them into feature space
         test_data, test_ids, test_label = self.fetchTestData()
-        # if len(test_trained) == 0:
-        # if self.feature == 's':
-        #     kmeans = joblib.load(self.modelpath + 'kmeans_' + str(no_clusters) + '_s.joblib')
-        #     print("aaaaaaaa")
-        #     histo_list = []
-        #     for des in test_data:
-        #         kp = np.asarray(des)
-        #         histo = np.zeros(no_clusters)
-        #         nkp = kp.shape[0]
-        #         for d in kp:
-        #                 idx = kmeans.predict([d])
-        #                 histo[idx] += 1/nkp
-        #         histo_list.append(histo)
-        #     test_data = histo_list
-        # else:
-        #     test_data = test_trained
-        # Fetch the labels for the images
-        # cur = self.conn.cursor()
-        # test_ids_st = str(set(test_ids)).replace('{', '(')
-        # test_ids_st = test_ids_st.replace('}', ')')
-        # cur.execute("SELECT image_id, aspect FROM img_meta WHERE image_id IN {0}".format(test_ids_st))
-        # labels = cur.fetchall()
-        # print(test_label)
+        
         labels = np.array([-1.0 if x == 'palmar' else 1.0 for x in test_label])
 
         # Calculate accuracy
@@ -357,7 +347,13 @@ class classify(dimReduction):
         correct = np.sum(y_pred == labels)
         print(correct/len(test_data))
         y_pred = np.array(['palmar' if x == -1.0 else "dorsal" for x in y_pred])
-        self.visualize(y_pred, test_ids, "task_4_svm_" + self.feature)
+
+        check_label_predict = {}
+        for i in range(len(test_ids)):
+            check_label_predict[test_ids[i]] = test_label[i]
+
+        self.visualize(y_pred, test_ids, "task_4_svm_" + self.feature, label = check_label_predict)
+        
         return correct/len(test_data), svm_data, test_data
         # print(count/len(test_data))
     
@@ -368,7 +364,7 @@ class classify(dimReduction):
         # _, _ = self.fetchTestData()
         # return
         cur = self.conn.cursor()
-        print(self.table_f, depth)
+        # print(self.table_f, depth)
         no_clusters = 400
         
         # sqlm = "SELECT image_id FROM img_meta WHERE subjectid = '{s}'".format(s=subject)
@@ -388,8 +384,8 @@ class classify(dimReduction):
 
 
             tree_data = np.vstack((np.array(dorsal_data), np.array(palmar_data)))
-            y1_test = ["dorsal" for _ in range(len(dorsal_data))]
-            y2_test = ["palmar" for _ in range(len(palmar_data))]
+            y1_test = [1.0 for _ in range(len(dorsal_data))]
+            y2_test = [-1.0 for _ in range(len(palmar_data))]
             tree_labels = np.hstack((y1_test, y2_test))
             # print(tree_data.shape)
             # print(tree_labels.shape)
@@ -403,34 +399,257 @@ class classify(dimReduction):
                     joblib.dump([tree, my_tree], f1)
 
         
-        data_test, meta_test, label = self.fetchTestData()
+        data_test, meta_test, test_label = self.fetchTestData()
         
-        print(np.asarray(data_test).shape)
-        imgs_test = np.append(np.asarray(data_test), np.asarray(label).reshape((-1,1)), axis=1)
+        labels = np.array([-1.0 if x == 'palmar' else 1.0 for x in test_label])
+
+        # print(np.asarray(data_test).shape)
+        imgs_test = np.append(np.asarray(data_test), np.asarray(labels).reshape((-1,1)), axis=1)
         imgs_test = np.append(np.asarray(meta_test).reshape((-1,1)), np.asarray(imgs_test), axis=1)
 
         count = 0
         prediction_label = []
         for row in imgs_test:
-            # print(row)
+            # print(row[-1])
             result = tree.print_leaf(tree.classify(row[1:], my_tree))
             d = eval(str(result))
             # print(d.keys())
             # print(d)
-            if row[-1] in d and int(d[row[-1]][:-1]) > 50:
+            if float(row[-1]) in d and int(d[float(row[-1])][:-1]) > 50:
+                # print("OK")
                 count += 1
-                prediction_label.append(row[-1])
+                # prediction_label.append(row[-1])
+            
+            if row[-1] == -1.0:
+                prediction_label.append("dorsal")
             else:
-                if row[-1] == "palmar":
-                    prediction_label.append("dorsal")
-                else:
-                    prediction_label.append("palmar")
+                prediction_label.append("palmar")
             # print ("Image: %s. Actual: %s. Predicted: %s" %
             #         (row[0], row[-1], result))
         print("Result:", float(count / len(imgs_test)))
-        self.visualize(prediction_label, imgs_test[:,0], "task_4_tree_" + self.feature)
+
+        check_label_predict = {}
+        for i in range(len(meta_test)):
+            check_label_predict[meta_test[i]] = test_label[i]
+        self.visualize(prediction_label, imgs_test[:,0], "task_4_tree_" + self.feature, label = check_label_predict)
         return float(count / len(imgs_test))
 
+
+    def similarity(self, res, id):
+            s = {}
+            temp = res[id]
+            for i in res:
+                dist = 1/(1+(math.sqrt(np.sum([((a-b) ** 2) for (a, b) in zip(temp, res[i])]))))
+                s[i] = dist
+            s = sorted(s.items(), key = lambda x : x[1])
+            return s
+    
+    
+    def PPR(self):
+        # imgP = imageProcess()
+        no_clusters = 400
+        res = self.fetchData()
+        threshold = 6
+        folder = self.testpath
+        #meta_data = imgP.readMetaData(meta_file="C:\\Users\\nemad\\Downloads\\MWDB\\project\\phase3_sample_data\\phase3_sample_data\\labelled_set2.csv")
+        meta_data_verify = self.readMetaData()
+        meta_file= self.metaset2
+        with open(meta_file, 'r') as file:
+            csv_reader = csv.reader(file)
+            meta_file = []
+            for idx, row in enumerate(csv_reader):
+                if idx == 0:
+                    continue
+                sub_id = row[1]
+                id = row[8].split('.')[0]
+                gender = row[3]
+                orientation = row[7].split(' ')
+                accessories = row[5]
+                meta_file.append([sub_id, id, gender, orientation[0], orientation[1], accessories])
+
+        meta_data = meta_file
+
+        dorsal_ids = []
+        palmar_ids = []
+        d_personalization = {}
+        p_personalization = {}
+        p = d = 0
+        for m in meta_data:
+            if m[3] == 'dorsal':
+                dorsal_ids.append(m[1])
+                d+=1
+            else:
+                palmar_ids.append(m[1])
+                p+=1
+        #print("TRAINING DATA HAS ", p, "PALMAR and ", d, "DORSAL IMAGES")
+
+        for i in res:
+                d_personalization[i] = 0
+
+        data = []
+        for i in res:
+            # print("i:",i)
+            weights = ppr_helper.similarity(res, i)
+            temp_dict = {}
+            for w in weights:
+                temp_dict[w[0]] = w[1]
+            data.append(temp_dict)
+        df = pd.DataFrame(data, index=res.keys())
+
+        for i in res:
+            weights = ppr_helper.similarity(res, i)
+        img_no = 1
+        w = 10
+        h = 15
+        fig = plt.figure(figsize=(10, 8))
+        columns = 10
+        rows = 10
+        final_Result = {}
+        test_data, test_ids, test_label = self.fetchTestData()
+        for i in range(len(test_data)):
+            temp = df
+            # if self.feature == 'm':
+            #     pixels, size = self.fetchImagesAsPix(filename)
+            #     val = self.imageMoments(pixels, size)
+            #         # Convert to string to insert into DB as an array
+            # elif self.feature == 's':
+            #     val = self.sift_features(filename)
+            # elif self.feature == 'h':
+            #     val = self.hog_process(filename)
+    
+            # elif self.feature == 'l':
+            #     val = self.lbp_preprocess(filename)
+            
+            # else:
+            #     print('Incorrect value for Model provided')
+            #     exit()
+
+            h_val = test_data[i]
+            # filename = filename[-16:]
+            # filename = filename[0:len(filename)-4]
+            filename = test_ids[i]
+            # print("file:",filename)
+            s = {}
+            col = []
+            for i in res:
+                dist = math.sqrt(np.sum([((a - b) ** 2) for (a, b) in zip(h_val, res[i])]))
+                s[i] = dist
+                col.append(dist)
+            df1 = pd.DataFrame([s], index=[filename])
+            temp = pd.concat([temp, df1])
+            col.append(0)
+            temp[filename] = col
+            d_personalization[filename] = 1
+            pageRankScores = np.zeros(len(d_personalization))
+            teleportation_matrix = np.zeros(len(d_personalization))
+            t = 0
+            for i in d_personalization:
+                pageRankScores[t] = d_personalization[i]
+                teleportation_matrix[t] = d_personalization[i]
+                t += 1
+
+            pageRankScores = ppr_helper.ppr(temp, pageRankScores, teleportation_matrix, 0.85)
+            z = 0
+            res1 = {}
+            for i in d_personalization:
+                if i != filename:
+                    res1[i] = pageRankScores[z]
+                z += 1
+            res1 = sorted(res1.items(), key=lambda x: x[1], reverse=True)
+            del d_personalization[filename]
+            prob_d = res1[0]
+            d = 0
+            p = 0
+            for tp in range(5):
+                cl = res1[tp][0]
+                if cl in dorsal_ids:
+                    d += res1[tp][1]
+                else:
+                    p += res1[tp][1]
+            if d > p:
+                print(filename, "is dorsal with probability", d)
+                title = "dorsal"
+            else:
+                print(filename, "is palmar with probability", p)
+                title = "palmar"
+            final_Result[filename] = title
+            img = imread(folder + filename + ".jpg")
+            ax1 = fig.add_subplot(rows, columns, img_no)
+            ax1.title.set_text(title)
+            plt.imshow(img)
+            plt.axis('off')
+            img_no += 1
+        verification_d = {}
+        for i in meta_data_verify:
+            verification_d[i[1]] = i[3]
+
+        count = 0
+        for i in final_Result:
+            if final_Result[i] == verification_d[i]:
+                count += 1
+        print("accuracy ", count/len(final_Result)*100)
+        plt.suptitle("Personalized PageRank Classifier")
+        plt.show()
+
+    def fetchData(self, table_name=""):
+        no_clusters = 400
+        if not table_name:
+            table_name = self.table_f
+        self.checkCreate()
+        cur = self.conn.cursor()
+        res = {}
+        cur.execute("SELECT imageid, imagedata FROM {0}".format(table_name))
+        imgs = cur.fetchall()
+        # Separate Image IDs and Image data
+        ids = []
+        data = []
+
+        for img in imgs:
+            if self.feature == 's' or (self.feature == "m" and self.dim in ("nmf", "lda")):
+                data.extend(eval(img[1]))
+            elif self.feature == "m":
+                data.append(np.asarray(eval(img[1])).reshape((-1)))
+            else:
+                data.append(np.asarray(eval(img[1])))
+            ids.append(img[0])
+            # data.append(eval(img[1]))
+
+        if self.feature == "s" or (self.feature == "m" and self.dim in ("nmf", "lda")):
+            try:
+                # print(self.modelpath + 'kmeans_' + str(no_clusters) + '_' + self.feature + '.joblib')
+                kmeans = joblib.load(self.modelpath + 'kmeans_' + str(no_clusters) + '_' + self.feature + '.joblib')
+                histo_list = []
+                # print("aaaaaaaaaaa")
+                for des in imgs:
+                    kp = np.asarray(eval(des[1]))
+                    histo = np.zeros(no_clusters)
+                    nkp = kp.shape[0]
+                    for d in kp:
+                        idx = kmeans.predict([d])
+                        histo[idx] += 1/nkp
+                    histo_list.append(histo)
+                data = np.asarray(histo_list)
+                # print(data.shape)
+            except:
+                # print("bbbbbbbbbbbbb")
+
+                Kmeans = KMeans_SIFT(no_clusters)
+                clusters = Kmeans.kmeans_process(data)
+                imgs_zip = [(img[0],np.asarray(eval(img[1]))) for img in imgs]
+                data = Kmeans.newMatrixSift(imgs_zip, clusters ,'kmeans_' + str(no_clusters) + "_" + self.feature)
+                # print(np.asarray(data).shape)
+
+
+        for i in range(len(ids)):
+            # res.append({img[0]: eval(img[1])})
+            res[ids[i]] = data[i]
+            # ids.append(img[0])
+            # data.append(eval(img[1]))
+        # print("returning", res,"ending")
+        return res
+   
+   
+   
    # Method to use LSH to classify
     def lshClassify(self, n=10, label='Hand_0000002', k=5, l=3):
         # Check if tables exist otherwise create them
@@ -440,10 +659,10 @@ class classify(dimReduction):
         neighbors = lsh.NNSearch(list(img_dict.keys()), index, label)
 
         # Perform Naive KNN
-        distances = sorted([(n,self.simMetric(np.array(img_dict[label]), np.array(img_dict[n]))) for n in neighbors], key=lambda x:x[0])[0:n]
+        distances = sorted([(n,self.simMetric(np.array(img_dict[label]), np.array(img_dict[n]))) for n in neighbors],reverse=True, key=lambda x:x[1])[0:n]
         nearest = [x[0] for x in distances]
         print('The Nearest Images to {0} are : '.format(label), nearest)
-        lsh.display_images(nearest)
+        self.display_images(nearest, 'feedback.png')
 
         return [(x,img_dict[x]) for x in nearest], [(x,img_dict[x]) for x in neighbors]
 
@@ -480,26 +699,118 @@ class classify(dimReduction):
 
         # Input of each image as Relevant or Irrelevant
         print('Please provide feedback for each of the nearest Images (Relevant - R/ Irrelevant - I): ')
+        print('Control Options: Skip image - S / Exit Feedback - E')
         feedback = []
+        p_feedback = 0
+        p_feedback_imgs = []
         for x,y in nearest:
             ir = input('{0}: '.format(x))
             if ir == 'R':
                 feedback.append(1)
-            else:
+                p_feedback_imgs.append(x)
+                p_feedback += 1
+            elif ir == 'I':
                 feedback.append(-1)
-        algo = input('Please choose the algorithm for the feedback mechanism: (SVM -svm, Decision Tree -dt, PPR -ppr, Probability -prob)')
+            elif ir == 'S':
+                feedback.append(0)
+            elif ir == 'E':
+                break
+
+        algo = input('Please choose the algorithm for the feedback mechanism: '
+                     '(SVM -svm, Decision Tree -dt, PPR -ppr, Probability -prob)')
 
         if algo == 'svm':
             svm = SVM(C=1000.1)
-            svm_data = np.array([x[1] for x in nearest])
-            svm_labels = np.array(feedback)
+            rel_data = [nearest[i][1] for i,x in enumerate(feedback) if x == 1]
+            irel_data = [nearest[i][1] for i,x in enumerate(feedback) if x == -1]
+            rel_labels = np.array([1.0 for x in feedback if x == 1])
+            irel_labels = np.array([-1.0 for x in feedback if x == -1])
+            svm_labels = np.hstack((rel_labels, irel_labels))
+            svm_data = np.vstack((np.array(rel_data), np.array(irel_data)))
             svm.fit(svm_data, svm_labels)
             y_pred = svm.predict([x[1] for x in neighbors])
             indices = [i for i, x in enumerate(y_pred) if x == 1]
             new_neighbors = [neighbors[i] for i in indices]
-            distances = sorted([(n, self.simMetric(np.array(label), np.array(n))) for label, n in new_neighbors], key=lambda x: x[0])[0:n]
+            src_image = [x[1] for x in nearest if x[0] == label]
+            distances = sorted([(l, self.simMetric(np.array(src_image[0]), np.array(n))) for l, n in new_neighbors], key=lambda x: x[1], reverse=True)[0:n]
             new_nearest = [x[0] for x in distances]
             print('The New Nearest Images to {0} are : '.format(label), new_nearest)
+            self.display_images(new_nearest, 'feedback.png')
+
+        if algo == 'dt':
+            
+            tree = DecisionTree(max_depth = 10, min_support = 1)
+            rel_data = [nearest[i][1] for i,x in enumerate(feedback) if x == 1]
+            irel_data = [nearest[i][1] for i,x in enumerate(feedback) if x == -1]
+            rel_labels = np.array([1.0 for x in feedback if x == 1])
+            irel_labels = np.array([-1.0 for x in feedback if x == -1])
+            tree_labels = np.hstack((rel_labels, irel_labels))
+            tree_data = np.vstack((np.array(rel_data), np.array(irel_data)))
+
+            # print(tree_labels)
+            # tree_data = np.vstack((np.array(dorsal_data), np.array(palmar_data)))
+            # y1_test = [1.0 for _ in range(len(dorsal_data))]
+            # y2_test = [-1.0 for _ in range(len(palmar_data))]
+            # tree_labels = np.hstack((y1_test, y2_test))
+            # print(tree_data.shape)
+            # print(tree_labels.shape)
+        
+            imgs_red = np.append(np.asarray(tree_data), np.asarray(tree_labels).reshape((-1,1)), axis=1)
+
+            my_tree = tree.build_tree(imgs_red)
+
+            
+        
+            # tree = decisionTreeClassify(depth = 5)
+            # tree_data = np.array([x[1] for x in nearest])
+            # tree_labels = np.array(feedback)
+
+            # imgs_red = np.append(np.asarray(tree_data), np.asarray(tree_labels).reshape((-1,1)), axis=1)
+
+            # my_tree = tree.build_tree(imgs_red)
+            
+            data_test = [x[1] for x in neighbors]
+            test_ids = [x[0] for x in neighbors]
+
+            cur = self.conn.cursor()
+            test_ids_st = str(set(test_ids)).replace('{', '(')
+            test_ids_st = test_ids_st.replace('}', ')')
+            cur.execute("SELECT image_id, aspect FROM img_meta WHERE image_id IN {0}".format(test_ids_st))
+            labels = cur.fetchall()
+            labels = np.array([-1.0 if x[1] == 'palmar' else 1.0 for x in labels])
+
+            # print(np.asarray(data_test).shape)
+            # print(np.asarray(labels).shape)
+            imgs_test = np.append(np.asarray(data_test), np.asarray(labels).reshape((-1,1)), axis=1)
+            # imgs_test = np.append(np.asarray(test_ids).reshape((-1,1)), np.asarray(imgs_test), axis=1)
+
+            # count = 0
+            y_pred = []
+            for row in imgs_test:
+                # print(row[-1])
+                result = tree.print_leaf(tree.classify(row, my_tree))
+                d = eval(str(result))
+                # print(d.keys())
+                # print(d)
+                if -1.0 in d and int(d[-1.0][:-1]) > 50:
+                    # print("OK")
+                    # count += 1
+                    y_pred.append(-1)
+                else:
+                    # print("Have 1")
+                    y_pred.append(1)
+                # print ("Image: %s. Actual: %s. Predicted: %s" %
+                #         (row[0], row[-1], result))
+            # print("Result:", float(count / len(imgs_test)))
+            # print(y_pred)
+            # y_pred = svm.predict([x[1] for x in neighbors])
+            indices = [i for i, x in enumerate(y_pred) if x == 1]
+            new_neighbors = [neighbors[i] for i in indices]
+            src_image = [x[1] for x in nearest if x[0] == label]
+            distances = sorted([(l, self.simMetric(np.array(src_image[0]), np.array(n))) for l, n in new_neighbors], key=lambda x: x[1], reverse=True)[0:n]
+            new_nearest = [x[0] for x in distances]
+            print('The New Nearest Images to {0} are : '.format(label), new_nearest)
+            self.display_images(new_nearest, 'feedback.png')
 
         elif algo == 'prob':
             rel_indices = [i for i, x in enumerate(feedback) if x == 1]
@@ -509,7 +820,108 @@ class classify(dimReduction):
             scores = self.probRelFeedback(relevant, irrelevant, neighbors)
             new_nearest = [x[0] for x in scores[0:n]]
             print('The New Nearest Images to {0} are : '.format(label), new_nearest)
-        
+            self.display_images(new_nearest, 'feedback.png')
+
+        elif algo == 'ppr':
+            data = []
+            nearest_dict = {}
+            personalization = {}
+            for i in nearest:
+                nearest_dict[i[0]] = i[1]
+            for i in nearest_dict:
+                weights = ppr_helper.similarity(nearest_dict, i)
+                temp_dict = {}
+                for w in weights:
+                    temp_dict[w[0]] = w[1]
+                data.append(temp_dict)
+                personalization[i] = 0
+            df = pd.DataFrame(data, index=nearest_dict.keys())
+            y_pred = []
+            for neighbor in neighbors:
+                temp = df
+                h_val = neighbor[1]
+                s = {}
+                col = []
+                for i in nearest_dict:
+                    dist = math.sqrt(np.sum([((a - b) ** 2) for (a, b) in zip(h_val, nearest_dict[i])]))
+                    s[i] = dist
+                    col.append(dist)
+                df1 = pd.DataFrame([s], index=[neighbor[0]])
+                temp = pd.concat([temp, df1])
+                col.append(0)
+                temp[neighbor[0]] = col
+                personalization[neighbor[0]] = 1
+
+                pageRankScores = np.zeros(len(personalization))
+                teleportation_matrix = np.zeros(len(personalization))
+                t = 0
+                for i in personalization:
+                    pageRankScores[t] = personalization[i]
+                    teleportation_matrix[t] = personalization[i]
+                    t += 1
+
+                pageRankScores = ppr_helper.ppr(temp, pageRankScores, teleportation_matrix, 0.85)
+                print(pageRankScores)
+                del personalization[neighbor[0]]
+
+                z = 0
+                res1 = {}
+                for i in d_personalization:
+                    if i != neighbor[0]:
+                        res1[i] = pageRankScores[z]
+                    z += 1
+                res1 = sorted(res1.items(), key=lambda x: x[1], reverse=True)
+
+                prob_d = res1[0]
+                d = 0
+                p = 0
+                for tp in range(5):
+                    cl = res1[tp][0]
+                    if cl == 1:
+                        d += res1[tp][1]
+                    else:
+                        p += res1[tp][1]
+                if d > p:
+                    print(filename, "is Relevant with probability", d)
+                    title = 1
+                else:
+                    print(filename, "is Irrelevant with probability", p)
+                    title = -1
+                y_pred.append(title)
+                
+            indices = [i for i, x in enumerate(y_pred) if x == 1]
+            new_neighbors = [neighbors[i] for i in indices]
+            src_image = [x[1] for x in nearest if x[0] == label]
+            distances = sorted([(l, self.simMetric(np.array(src_image[0]), np.array(n))) for l, n in new_neighbors], key=lambda x: x[1], reverse=True)[0:n]
+            new_nearest = [x[0] for x in distances]
+            print('The New Nearest Images to {0} are : '.format(label), new_nearest)
+            self.display_images(new_nearest, 'feedback.png')
+
+
+
+    def display_images(self, images, title):
+        no_images = len(images)
+        columns = 4
+        rows = no_images // columns
+        if no_images % columns != 0:
+            rows += 1
+        fig = plt.figure(figsize=(30, 20))
+        ax = []
+        fig.canvas.set_window_title('LSH NN Search')
+        for i in range(no_images):
+            img = imread(self.ogpath + self.ext.replace('*', images[i]))
+            # create subplot and append to ax
+            ax.append(fig.add_subplot(rows, columns, i+1))
+            if i == 0:
+                    ax[-1].set_title("Given Image: " + images[i])  # set title
+            else:
+                    ax[-1].set_title("Image "+str(i) + ": " + images[i])  # set title
+            ax[-1].axis('off')
+            plt.imshow(img)
+        plt.savefig(self.outpath + title)
+        plt.show()
+    
+    
     # Fetch 11K images
     def fetch11KImages(self):
         # Check if table exists for 11 K images
@@ -549,6 +961,7 @@ class classify(dimReduction):
         else:
             print('11K imagedata already loaded into the Database')
             # Read data from Table
+        print('Fetching the 11k images from the Database...')
         cur.execute("SELECT * FROM imagedata_11K_{0}".format(self.feature))
         data = cur.fetchall()
         img_dict = {}
@@ -558,7 +971,7 @@ class classify(dimReduction):
         cur.close()
         return img_dict
 
-    def visualize(self, clusters, image_id, title, k = None):
+    def visualize(self, clusters, image_id, title, k = None, label = None):
         # print(self.dirpath)
 
         cluster_dic = {}
@@ -573,7 +986,7 @@ class classify(dimReduction):
         # fig = plt.figure()
         # print(cluster_dic)
         number_of_files = len(image_id)
-        openFile = open(self.outpath + title.lower() + ".html", "w")
+        openFile = open(self.outpath + title.replace(" ","_").lower() + ".html", "w")
         openFile.write("""<!DOCTYPE html><html><head><style>* {box-sizing: border-box;}.column {
                         float: left;
                         width: 10%;
@@ -597,7 +1010,7 @@ class classify(dimReduction):
             if key == "palmar" or key == "dorsal":
                 openFile.write("<h5>" + key.title() + " Images Prediction </h5>")
             else:
-                openFile.write("<h5>Cluster " + str(key)+ '</h5>')
+                openFile.write("<h5>Cluster " + str(int(key))+ '</h5>')
             for i in range((number_of_files // 10) + 1):
                 openFile.write("""<div class="row">""")
                 if (number_of_files - i*10) >= 10:
@@ -610,7 +1023,10 @@ class classify(dimReduction):
                     if k:
                         openFile.write('<img src="' + self.dirpath + value[i * 10 + j] + self.ext[1:] + '" style="width:100%">')
                     else:
-                        openFile.write('<img src="' + self.testpath + value[i * 10 + j] + self.ext[1:] + '" style="width:100%">')
+                        wrong = '"'
+                        if label[value[i * 10 + j]] != key:
+                            wrong = ';border-color :red" border = "5"'
+                        openFile.write('<img src="' + self.testpath + value[i * 10 + j] + self.ext[1:] + '" style="width:100%' + wrong + '>')
                         
                     openFile.write('</div>')
                     # print(value[i * 10 + j])
@@ -635,55 +1051,56 @@ class classify(dimReduction):
             # plt.show()
         openFile.close()
 
-feature = input('Please choose a feature model - SIFT(s), Moments(m), LBP(l), Histogram(h): ')
-if feature not in ('s', 'm', 'l', 'h'):
-    print('Please enter a valid feature model!')
-    exit()
-technique = input('Please choose a dimensionality reduction technique - PCA(pca), SVD(svd), NMF(nmf), LDA(lda): ')
+# feature = input('Please choose a feature model - SIFT(s), Moments(m), LBP(l), Histogram(h): ')
+# if feature not in ('s', 'm', 'l', 'h'):
+#     print('Please enter a valid feature model!')
+#     exit()
+# technique = input('Please choose a dimensionality reduction technique - PCA(pca), SVD(svd), NMF(nmf), LDA(lda): ')
+# c = classify(feature = feature, dim = technique)
+# c.clusterClassify()
+# # for f in ["l", "h", "m", "s"]:
+# #     # for t in ["svd", "pca", "lda" , "nmf"]:
+# #     c = classify(feature = f)
+# # # c.relevanceFeedback()
+# #     c.clusterClassify()
 
-# for f in ["l", "h", "m", "s"]:
-#     # for t in ["svd", "pca", "lda" , "nmf"]:
-#     c = classify(feature = f)
-# # c.relevanceFeedback()
-#     c.clusterClassify()
+#         # c.LSAnalysis()
+# c = classify(feature = feature)
+# # c.PPR()
+# exit(1)
+# # # c.svmClassify()
 
-        # c.LSAnalysis()
-c = classify(feature = feature)
-c.decisionTreeClassify()
-exit(1)
-# # c.svmClassify()
+# obj_list = []
+# x_axis = []
+# data = []
+# test = []
+# for i in range(100,2001,100):
+#     # accuracy = c.decisionTreeClassify(i)
+#     accuracy, data, test = c.svmClassify(i + 0.1, data, test)
+#     # Calculate the Centroids and Clusters
+#     # centroids, clusters = kmeans.fit(table, False)
+#     # # Create the Cluster matrix for k = 5
+#     # if i == 5:
+#     #     cluster_mat = [(x,clusters[x]) for x in range(len(table))]
+#     # # Calculate the Objective function
+#     # ac = kmeans.objective_func(table, centroids, clusters)
+#     # Append to objective function list
+#     obj_list.append(accuracy)
+#     # Create x axis
+#     x_axis.append(i + 0.1)
 
-obj_list = []
-x_axis = []
-data = []
-test = []
-for i in range(100,2001,100):
-    # accuracy = c.decisionTreeClassify(i)
-    accuracy, data, test = c.svmClassify(i + 0.1, data, test)
-    # Calculate the Centroids and Clusters
-    # centroids, clusters = kmeans.fit(table, False)
-    # # Create the Cluster matrix for k = 5
-    # if i == 5:
-    #     cluster_mat = [(x,clusters[x]) for x in range(len(table))]
-    # # Calculate the Objective function
-    # ac = kmeans.objective_func(table, centroids, clusters)
-    # Append to objective function list
-    obj_list.append(accuracy)
-    # Create x axis
-    x_axis.append(i + 0.1)
-
-# Save CSV files
-# with open('clusters.csv', 'w', encoding='utf-8', newline="") as f:
-#     writer = csv.writer(f)
-#     writer.writerows(cluster_mat)
-print(obj_list, x_axis)
-# Plot The objective function vs number of clusters
-plt.plot(x_axis, obj_list)
-plt.xlabel('C')
-plt.ylabel('Accuracy')
-#plt.savefig('graph.png')
-plt.title('SVM - ' + feature + ' - ' + "Labeled Set 2 and Unlabeled Set 2")
-plt.show()
+# # Save CSV files
+# # with open('clusters.csv', 'w', encoding='utf-8', newline="") as f:
+# #     writer = csv.writer(f)
+# #     writer.writerows(cluster_mat)
+# print(obj_list, x_axis)
+# # Plot The objective function vs number of clusters
+# plt.plot(x_axis, obj_list)
+# plt.xlabel('C')
+# plt.ylabel('Accuracy')
+# #plt.savefig('graph.png')
+# plt.title('SVM - ' + feature + ' - ' + "Labeled Set 2 and Unlabeled Set 2")
+# plt.show()
 
 # svm = SVM() # Linear Kernel
 # svm.fit(data=data_dict)
