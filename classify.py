@@ -249,7 +249,7 @@ class classify(dimReduction):
             # print(label_dict[test_ids[idx]])
             # print('dorsal: ', dorsalValue)
             # print('palmar: ', palmarValue)
-        self.visualize(y_pred, test_ids, "task_1_" + self.feature + '_' + self.dim, label = label_dict)
+        self.visualize(y_pred, test_ids, "task_1_" + self.feature + '_' + self.dim, label = label_dict , accuracy = cnt/len(test_data))
 
         print('\nAccuracy - {0} - {1}: {2}'.format(self.feature, self.dim,cnt/len(test_data)))
 
@@ -267,8 +267,8 @@ class classify(dimReduction):
         palmar_centroids, palmar_clusters = kmeans.fit(palmar_data)
         # print(dorsal_centroids, dorsal_clusters, dorsal_ids)
         # print(palmar_centroids, palmar_clusters, palmar_ids)
-        self.visualize(dorsal_clusters, dorsal_ids, "Dorsal " + self.feature.upper(), k)
-        self.visualize(palmar_clusters, palmar_ids, "Palmar " + self.feature.upper(), k)
+        self.visualize(dorsal_clusters, dorsal_ids, "Dorsal " + self.feature.upper(), k=k)
+        self.visualize(palmar_clusters, palmar_ids, "Palmar " + self.feature.upper(), k=k)
         # exit(1)
         # K Nearest Neighbours on the Cluster Centroids
         dorsal_centroids = [(x, 'dorsal') for x in dorsal_centroids]
@@ -309,7 +309,7 @@ class classify(dimReduction):
         for x in labels:
             label_dict[x[0]] = x[1]
 
-        self.visualize(y_pred, test_ids, "task_2_" + self.feature, label = label_dict)
+        self.visualize(y_pred, test_ids, "task_2_" + self.feature, label = label_dict, accuracy = cnt/len(test_data))
 
         print('Accuracy - {0}: {1}'.format(self.feature,cnt/len(test_data)))
 
@@ -352,8 +352,9 @@ class classify(dimReduction):
         for i in range(len(test_ids)):
             check_label_predict[test_ids[i]] = test_label[i]
 
-        self.visualize(y_pred, test_ids, "task_4_svm_" + self.feature, label = check_label_predict)
+        self.visualize(y_pred, test_ids, "task_4_svm_" + self.feature, label = check_label_predict, accuracy = correct/len(test_data))
         
+        # return correct/len(test_data), svm_data, test_data
         return correct/len(test_data), svm_data, test_data
         # print(count/len(test_data))
     
@@ -431,7 +432,7 @@ class classify(dimReduction):
         check_label_predict = {}
         for i in range(len(meta_test)):
             check_label_predict[meta_test[i]] = test_label[i]
-        self.visualize(prediction_label, imgs_test[:,0], "task_4_tree_" + self.feature, label = check_label_predict)
+        self.visualize(prediction_label, imgs_test[:,0], "task_4_tree_" + self.feature, label = check_label_predict, accuracy = float(count / len(imgs_test)))
         return float(count / len(imgs_test))
 
 
@@ -971,7 +972,7 @@ class classify(dimReduction):
         cur.close()
         return img_dict
 
-    def visualize(self, clusters, image_id, title, k = None, label = None):
+    def visualize(self, clusters, image_id, title, accuracy = None, k = None, label = None):
         # print(self.dirpath)
 
         cluster_dic = {}
@@ -1002,15 +1003,19 @@ class classify(dimReduction):
                         </style>
                         </head>
                         <body>""")
-        openFile.write("<h3>The resulting image of " + title +":</h3>")
+        if accuracy:
+            openFile.write("<h1>The resulting image of " + title + " with " + str(accuracy) + " accuracy :</h1>")
+            # accuracy = 
+        else:
+            openFile.write("<h1>The resulting image of " + title + ":</h1>")
         for key, value in sorted(cluster_dic.items()):
             # print(key, value)
             number_of_files = len(value)
             # print(number_of_files // 10)
             if key == "palmar" or key == "dorsal":
-                openFile.write("<h5>" + key.title() + " Images Prediction </h5>")
+                openFile.write("<h3>" + key.title() + " Images Prediction </h3>")
             else:
-                openFile.write("<h5>Cluster " + str(int(key))+ '</h5>')
+                openFile.write("<h3>Cluster " + str(int(key))+ '</h3>')
             for i in range((number_of_files // 10) + 1):
                 openFile.write("""<div class="row">""")
                 if (number_of_files - i*10) >= 10:
